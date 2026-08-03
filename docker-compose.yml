@@ -1,9 +1,9 @@
 services:
-  hmpps-template-kotlin:
-    image: ghcr.io/ministryofjustice/hmpps-template-kotlin:latest
+  hmpps-person-location-api:
+    image: ghcr.io/ministryofjustice/hmpps-person-location-api:latest
     networks:
       - hmpps
-    container_name: hmpps-template-kotlin
+    container_name: hmpps-person-location-api
     ports:
       - "8080:8080"
     healthcheck:

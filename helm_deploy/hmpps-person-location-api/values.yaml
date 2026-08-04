@@ -2,7 +2,14 @@ generic-service:
   nameOverride: hmpps-person-location-api
   productId: "DPS037" # productId for the product that this belongs too, i.e. DPS001, see README.md for details
 
-  replicaCount: 4
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 128m
+      memory: 1024Mi
+    limits:
+      cpu: 2048m
+      memory: 1280Mi
 
   image:
     repository: ghcr.io/ministryofjustice/hmpps-person-location-api
@@ -13,30 +20,56 @@ generic-service:
     enabled: true
     host: app-hostname.local # override per environment
     tlsSecretName: hmpps-person-location-api-cert
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "H2C"
+      nginx.ingress.kubernetes.io/server-snippet: |
+        server_tokens off;
+        location /queue-admin/retry-all-dlqs {
+          deny all;
+          return 401;
+        }
+        more_set_headers "Strict-Transport-Security: \"max-age=31536000; includeSubDomains; preload\"";
+
+  serviceAccountName: hmpps-person-location-api
 
   # Environment variables to load into the deployment
   env:
     SERVER_PORT: "8080"
     APPLICATIONINSIGHTS_CONFIGURATION_FILE: applicationinsights.json
-    # JAVA_TOOL_OPTIONS is set in the base image (hmpps-eclipse-temurin) with:
-    #   -XX:MaxRAMPercentage=50.0
-    # Uncomment below to override memory settings if needed.
-    # Check resources.limits.memory is set appropriately.
-    #
-    # Percentage-based example:
-    #   JAVA_TOOL_OPTIONS: "-XX:InitialRAMPercentage=50.0 -XX:MaxRAMPercentage=75.0"
-    #
-    # Fixed memory example:
-    #   JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m"
-
-  # Pre-existing kubernetes secrets to load as environment variables in the deployment.
-  # namespace_secrets:
-  #   [name of kubernetes secret]:
-  #     [name of environment variable as seen by app]: [key of kubernetes secret to load]
+    JDK_JAVA_OPTIONS: "-Xmx512m -XX:+UseG1GC"
+    SENTRY_TRACES_SAMPLE_RATE: '0.05'
+    SENTRY_IGNORED_EXCEPTIONS_FOR_TYPE: "org.apache.catalina.connector.ClientAbortException,org.springframework.web.servlet.resource.NoResourceFoundException,org.springframework.web.context.request.async.AsyncRequestNotUsableException"
 
   namespace_secrets:
     hmpps-person-location-api-application-insights:
       APPLICATIONINSIGHTS_CONNECTION_STRING: "APPLICATIONINSIGHTS_CONNECTION_STRING"
+    hmpps-person-location-api-sentry:
+      SENTRY_DSN: SENTRY_DSN
+      SENTRY_AUTH_TOKEN: SENTRY_AUTH_TOKEN
+    hmpps-person-location-api-client-creds:
+      CLIENT_ID: "API_CLIENT_ID"
+      CLIENT_SECRET: "API_CLIENT_SECRET"
+    hmpps-person-location-postgres:
+      DB_SERVER: "database_server"
+      DB_NAME: "database_name"
+      DB_USER: "database_username"
+      DB_PASS: "database_password"
+
+  allowlist:
+    groups:
+      - digital_staff_and_mojo
+      - moj_cloud_platform
+
+  retryDlqCronjob:
+    enabled: true
+    retryDlqSchedule: "0/30 7-19 * * 1-5"
+
+  scheduledDowntime:
+    enabled: true
+    startup: '30 6 * * 1-5'
+    shutdown: '30 21 * * 1-5'
+    timeZone: Europe/London
+    retryDlqSchedule: "0/30 7-19 * * 1-5"
 
 generic-prometheus-alerts:
   targetApplication: hmpps-person-location-api

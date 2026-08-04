@@ -37,6 +37,7 @@ class OpenApiDocsTest(
   }
 
   @Test
+  @Disabled("TODO Enable this test once you have an endpoint.")
   fun `the open api json contains documentation`() {
     webTestClient.get()
       .uri("/v3/api-docs")
@@ -49,11 +50,6 @@ class OpenApiDocsTest(
 
   @Test
   fun `the swagger json don't contain any duplicate methods`() {
-    // Methods in resource classes with the same name end up with operationIds that have _1 and _2 etc. in the name.
-    // When the code is then generated from the api docs we refer to the endpoint by operationId. If a new method is
-    // added or one removed then the _1 / _2 etc. can change order and thus we end up calling a completely different
-    // endpoint next time the code is generated. This test then prevents that from happening by ensuring all endpoints
-    // have method names / operation ids.
     webTestClient.get()
       .uri("/v3/api-docs")
       .accept(MediaType.APPLICATION_JSON)

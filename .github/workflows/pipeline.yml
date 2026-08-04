@@ -86,7 +86,7 @@ jobs:
       group: deploy-preprod
     needs:
       - build
-      - deploy_dev
+      - helm_lint
     uses: ministryofjustice/hmpps-github-actions/.github/workflows/deploy_env.yml@v2 # WORKFLOW_VERSION
     secrets: inherit
     with:
@@ -99,10 +99,11 @@ jobs:
       group: deploy-prod
     needs:
       - build
+      - deploy_dev
       - deploy_preprod
     uses: ministryofjustice/hmpps-github-actions/.github/workflows/deploy_env.yml@v2 # WORKFLOW_VERSION
     secrets: inherit
     with:
       environment: 'prod'
       app_version: '${{ needs.build.outputs.app_version }}'
-      slack_notification: 'false' # if 'true', it needs a valid PROD_RELEASES_SLACK_CHANNEL variable to be set
+      slack_notification: 'true'

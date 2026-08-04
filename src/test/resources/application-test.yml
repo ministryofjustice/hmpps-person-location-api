@@ -5,8 +5,29 @@ management.endpoint:
   health.cache.time-to-live: 0
   info.cache.time-to-live: 0
 
-hmpps-auth:
-  url: "http://localhost:8090/auth"
+integration:
+  hmpps-auth:
+    url: "http://localhost:8090/auth"
+
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate.generate_statistics: true
+  datasource:
+    hikari:
+      data-source-properties:
+        sslmode: 'disable'
+
+client:
+  id: person-location
+  secret: person-location
+
+db:
+  server: "localhost:5432"
+  name: "person_location"
+  user: "person"
+  pass: "location"
 
 springdoc:
   api-docs:

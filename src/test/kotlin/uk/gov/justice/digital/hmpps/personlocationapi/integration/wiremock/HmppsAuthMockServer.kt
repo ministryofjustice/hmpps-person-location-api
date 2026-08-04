@@ -2,7 +2,6 @@ package uk.gov.justice.digital.hmpps.personlocationapi.integration.wiremock
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
-import com.github.tomakehurst.wiremock.client.WireMock.get
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.http.HttpHeader
@@ -11,6 +10,7 @@ import org.junit.jupiter.api.extension.AfterAllCallback
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.BeforeEachCallback
 import org.junit.jupiter.api.extension.ExtensionContext
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.wiremock.WiremockConfig.mockServerConfig
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
@@ -29,6 +29,7 @@ class HmppsAuthApiExtension :
 
   override fun beforeEach(context: ExtensionContext) {
     hmppsAuth.resetRequests()
+    hmppsAuth.givenTokenGranted()
   }
 
   override fun afterAll(context: ExtensionContext) {
@@ -36,12 +37,8 @@ class HmppsAuthApiExtension :
   }
 }
 
-class HmppsAuthMockServer : WireMockServer(WIREMOCK_PORT) {
-  companion object {
-    private const val WIREMOCK_PORT = 8090
-  }
-
-  fun stubGrantToken() {
+class HmppsAuthMockServer : WireMockServer(mockServerConfig(8090)) {
+  fun givenTokenGranted() {
     stubFor(
       post(urlEqualTo("/auth/oauth/token"))
         .willReturn(
@@ -57,17 +54,6 @@ class HmppsAuthMockServer : WireMockServer(WIREMOCK_PORT) {
               """.trimIndent(),
             ),
         ),
-    )
-  }
-
-  fun stubHealthPing(status: Int) {
-    stubFor(
-      get("/auth/health/ping").willReturn(
-        aResponse()
-          .withHeader("Content-Type", "application/json")
-          .withBody(if (status == 200) """{"status":"UP"}""" else """{"status":"DOWN"}""")
-          .withStatus(status),
-      ),
     )
   }
 }

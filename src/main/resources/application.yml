@@ -6,24 +6,75 @@ spring:
   application:
     name: hmpps-person-location-api
 
-#  This jackson configuration is only applied for java.util.Date.
-#  It is ignored for LocalDateTime, and therefore unnecessary for most projects
-#  jackson:
-#    date-format: "yyyy-MM-dd HH:mm:ss"
+  datasource:
+    url: 'jdbc:postgresql://${db.server}/${db.name}?reWriteBatchedInserts=true'
+    username: ${db.user}
+    password: ${db.pass}
+
+    hikari:
+      connectionTimeout: 1000
+      validationTimeout: 500
+      maximumPoolSize: 30
+      auto-commit: false
+      data-source-properties:
+        sslmode: "verify-full"
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: false
+    locations: classpath:db/schema,classpath:db/data
+
+  jpa:
+    show-sql: false
+    generate-ddl: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          lob.non_contextual_creation: true
+          batch_size: 1000
+          fetch_size: 1000
+        globally_quoted_identifiers: true
+        globally_quoted_identifiers_skip_column_definitions: true
+        order_inserts: true
+        order_updates: true
+      org.hibernate.envers:
+        audit_table_suffix: _audit
+        revision_field_name: rev_id
+        revision_type_field_name: rev_type
+        modified_flag_suffix: _modified
+        store_data_at_delete: true
+        do_not_audit_optimistic_locking_field: false
+    open-in-view: false
+
+  jackson:
+    date-format: "yyyy-MM-dd HH:mm:ss"
+    default-property-inclusion: non_null
 
   security:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${hmpps-auth.url}/.well-known/jwks.json
+          jwk-set-uri: ${integration.hmpps-auth.url}/.well-known/jwks.json
 
       client:
+        registration:
+          default:
+            provider: hmpps-auth
+            client-id: ${client.id}
+            client-secret: ${client.secret}
+            authorization-grant-type: client_credentials
         provider:
           hmpps-auth:
-            token-uri: ${hmpps-auth.url}/oauth/token
+            token-uri: ${integration.hmpps-auth.url}/oauth/token
   http:
     codecs:
       max-in-memory-size: 10MB
+
+  threads.virtual.enabled: true
+
   web:
     error:
       include-message: always
@@ -59,6 +110,7 @@ management:
         time-to-live: 2000ms
 
 springdoc:
+  paths-to-exclude: "/queue-admin/**"
   api-docs:
     enabled: false
   swagger-ui:

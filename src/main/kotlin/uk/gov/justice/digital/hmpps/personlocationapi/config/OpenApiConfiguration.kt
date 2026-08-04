@@ -1,8 +1,11 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.config
 
+import io.swagger.v3.core.util.PrimitiveType
+import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Contact
 import io.swagger.v3.oas.models.info.Info
+import io.swagger.v3.oas.models.security.SecurityRequirement
 import io.swagger.v3.oas.models.security.SecurityScheme
 import io.swagger.v3.oas.models.servers.Server
 import org.springframework.boot.info.BuildProperties
@@ -30,7 +33,15 @@ class OpenApiConfiguration(buildProperties: BuildProperties) {
       Info().title("HMPPS Person Location Api").version(version)
         .contact(Contact().name("HMPPS Digital Studio").email("feedback@digital.justice.gov.uk")),
     )
-  // TODO Add security schema and roles in `.components()` and `.addSecurityItem()`
+    .components(
+      Components()
+        .addSecuritySchemes(
+          "PERSON_LOCATION_RO",
+          SecurityScheme().addBearerJwtRequirement("ROLE_PERSON_LOCATION__RO"),
+        ),
+    )
+    .addSecurityItem(SecurityRequirement().addList("PERSON_LOCATION_RO", listOf("read")))
+    .also { PrimitiveType.enablePartialTime() }
 }
 
 private fun SecurityScheme.addBearerJwtRequirement(role: String): SecurityScheme = type(SecurityScheme.Type.HTTP)

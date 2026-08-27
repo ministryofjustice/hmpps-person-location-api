@@ -115,3 +115,8 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+service:
+  domain-events:
+    poll-interval: PT0.1s
+    batch-size: 10

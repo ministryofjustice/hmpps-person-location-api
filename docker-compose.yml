@@ -1,31 +1,23 @@
 services:
-  hmpps-person-location-api:
-    image: ghcr.io/ministryofjustice/hmpps-person-location-api:latest
+  localstack:
+    image: nahuelnucera/ministack:latest
     networks:
       - hmpps
-    container_name: hmpps-person-location-api
     ports:
-      - "8080:8080"
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
-    environment:
-      - SERVER_PORT=8080
-      - HMPPS_AUTH_URL=http://hmpps-auth:8080/auth
-      - SPRING_PROFILES_ACTIVE=dev
+      - "4566:4566"
 
-  hmpps-auth:
-    image: ghcr.io/ministryofjustice/hmpps-auth:latest
+  person-location-db:
+    image: postgres
     networks:
       - hmpps
-    container_name: hmpps-auth
+    container_name: person-location-db
+    restart: always
     ports:
-      - "8090:8080"
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      - "5432:5432"
     environment:
-      - SERVER_PORT=8080
-      - SPRING_PROFILES_ACTIVE=dev
-      - APPLICATION_AUTHENTICATION_UI_ALLOWLIST=0.0.0.0/0
+      - POSTGRES_DB=person_location
+      - POSTGRES_USER=person
+      - POSTGRES_PASSWORD=l0c4710n
 
 networks:
   hmpps:

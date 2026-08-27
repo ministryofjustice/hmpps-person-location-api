@@ -11,7 +11,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.reactive.server.WebTestClient
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.container.LocalStackContainer
-import uk.gov.justice.digital.hmpps.personlocationapi.integration.container.LocalStackContainer.setLocalStackProperties
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.container.LocalStackContainer.setMiniStackProperties
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.container.PostgresContainer
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.wiremock.HmppsAuthApiExtension
 import uk.gov.justice.hmpps.test.kotlin.auth.JwtAuthorisationHelper
@@ -37,7 +37,7 @@ abstract class IntegrationTestBase {
   companion object {
     private val pgContainer = PostgresContainer.instance
     private val localStackContainer = LocalStackContainer.instance
-    const val DEFAULT_USERNAME = "TR4N5CH3DU13R"
+    const val DEFAULT_USERNAME = "P3r50nL0c4710n"
 
     @JvmStatic
     @DynamicPropertySource
@@ -50,7 +50,7 @@ abstract class IntegrationTestBase {
       }
 
       System.setProperty("aws.region", "eu-west-2")
-      localStackContainer?.also { setLocalStackProperties(it, registry) }
+      localStackContainer?.also { setMiniStackProperties(it, registry) }
     }
   }
 }

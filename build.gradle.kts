@@ -30,7 +30,6 @@ dependencies {
   runtimeOnly("org.postgresql:postgresql")
 
   testImplementation("org.testcontainers:postgresql:$testContainersVersion")
-  testImplementation("org.testcontainers:localstack:$testContainersVersion")
   testImplementation("uk.gov.justice.service.hmpps:hmpps-kotlin-spring-boot-starter-test:$hmppsKotlinVersion")
   testImplementation("org.springframework.boot:spring-boot-starter-webflux-test")
   testImplementation("org.wiremock:wiremock-standalone:$wiremockVersion")

@@ -22,7 +22,7 @@ object PostgresContainer {
       withEnv("HOSTNAME_EXTERNAL", "localhost")
       withDatabaseName("person_location")
       withUsername("person")
-      withPassword("location")
+      withPassword("l0c4710n")
       setWaitStrategy(Wait.forListeningPort())
       withReuse(false)
       start()

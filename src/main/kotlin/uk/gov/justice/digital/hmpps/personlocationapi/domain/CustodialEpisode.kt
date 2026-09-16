@@ -21,8 +21,8 @@ import java.util.UUID
 class CustodialEpisode(
   @NotNull
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "career_id", nullable = false)
-  var career: CustodialCareer,
+  @JoinColumn(name = "journey_id", nullable = false)
+  var journey: CustodialJourney,
 
   @Size(max = 7)
   @NotNull

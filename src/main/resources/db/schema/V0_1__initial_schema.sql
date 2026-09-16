@@ -1,4 +1,4 @@
-create type custodial_career_status as enum ('OPEN', 'CLOSED')
+create type custodial_journey_status as enum ('OPEN', 'CLOSED')
 ;
 
 create type episode_type as enum ('REMAND', 'INITIAL_COMMITTAL', 'RECALL', 'PROBATION_REVOCATION', 'OUTSIDE_JURISDICTION', 'PRODUCTION')
@@ -16,39 +16,39 @@ create type external_journey_status as enum ('SCHEDULED','IN_TRANSIT','COMPLETED
 create type external_leg_type as enum ('ARRIVAL', 'DEPARTURE')
 ;
 
-create table if not exists custodial_career
+create table if not exists custodial_journey
 (
-    id                uuid                    not null default uuidv7(),
-    version           int                     not null,
-    person_identifier varchar(7)              not null,
-    status            custodial_career_status not null,
-    is_active         boolean                 not null,
-    opened_at         timestamp               not null,
+    id                uuid                     not null default uuidv7(),
+    version           int                      not null,
+    person_identifier varchar(7)               not null,
+    status            custodial_journey_status not null,
+    is_active         boolean                  not null,
+    opened_at         timestamp                not null,
     closed_at         timestamp,
     notes             text,
-    constraint pk_custodial_career primary key (id)
+    constraint pk_custodial_journey primary key (id)
 )
 ;
 
-create index if not exists uq_custodial_career_person_active on custodial_career (person_identifier) where is_active = true;
-create index if not exists idx_custodial_career_person on custodial_career (person_identifier, opened_at desc);
+create index if not exists uq_custodial_journey_person_active on custodial_journey (person_identifier) where is_active = true;
+create index if not exists idx_custodial_journey_person on custodial_journey (person_identifier, opened_at desc);
 
 create table if not exists custodial_episode
 (
     id                uuid           not null default uuidv7(),
     version           int            not null,
-    career_id         uuid           not null,
+    journey_id        uuid           not null,
     person_identifier varchar(7)     not null,
     type              episode_type   not null,
     status            episode_status not null,
     committed_at      timestamp      not null,
     discharged_at     timestamp,
     constraint pk_custodial_episode primary key (id),
-    constraint fk_custodial_episode_career foreign key (career_id) references custodial_career (id)
+    constraint fk_custodial_episode_journey foreign key (journey_id) references custodial_journey (id)
 )
 ;
 
-create index if not exists idx_custodial_episode_career on custodial_episode (career_id, committed_at desc);
+create index if not exists idx_custodial_episode_journey on custodial_episode (journey_id, committed_at desc);
 create index if not exists idx_custodial_episode_person on custodial_episode (person_identifier, committed_at desc);
 
 create table if not exists prison_stay
@@ -158,20 +158,20 @@ create table if not exists hmpps_domain_event_audit
 
 create index if not exists idx_hmpps_domain_event_audit_event_type_entity_id on hmpps_domain_event_audit (event_type, entity_id);
 
-create table if not exists custodial_career_audit
+create table if not exists custodial_journey_audit
 (
-    rev_id            bigint                  not null,
-    rev_type          smallint                not null,
-    id                uuid                    not null default uuidv7(),
-    version           int                     not null,
-    person_identifier varchar(7)              not null,
-    status            custodial_career_status not null,
-    is_active         boolean                 not null,
-    opened_at         timestamp               not null,
+    rev_id            bigint                   not null,
+    rev_type          smallint                 not null,
+    id                uuid                     not null default uuidv7(),
+    version           int                      not null,
+    person_identifier varchar(7)               not null,
+    status            custodial_journey_status not null,
+    is_active         boolean                  not null,
+    opened_at         timestamp                not null,
     closed_at         timestamp,
     notes             text,
-    constraint pk_custodial_career_audit primary key (id, rev_id),
-    constraint fk_custodial_career_audit_revision foreign key (rev_id) references audit_revision (id)
+    constraint pk_custodial_journey_audit primary key (id, rev_id),
+    constraint fk_custodial_journey_audit_revision foreign key (rev_id) references audit_revision (id)
 )
 ;
 
@@ -181,7 +181,7 @@ create table if not exists custodial_episode_audit
     rev_type          smallint       not null,
     id                uuid           not null default uuidv7(),
     version           int            not null,
-    career_id         uuid           not null,
+    journey_id        uuid           not null,
     person_identifier varchar(7)     not null,
     type              episode_type   not null,
     status            episode_status not null,

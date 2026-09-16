@@ -14,14 +14,14 @@ import java.util.UUID
 
 @Audited
 @Entity
-@Table(name = "custodial_career")
-class CustodialCareer(
+@Table(name = "custodial_journey")
+class CustodialJourney(
   @Size(max = 7)
   @NotNull
   @Column(name = "person_identifier", nullable = false, length = 7)
   var personIdentifier: String,
 
-  @Column(name = "status", columnDefinition = "custodial_career_status", nullable = false)
+  @Column(name = "status", columnDefinition = "custodial_journey_status", nullable = false)
   var status: Status,
 
   @NotNull

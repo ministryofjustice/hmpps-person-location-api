@@ -3,8 +3,8 @@ package uk.gov.justice.digital.hmpps.personlocationapi.event
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
-import uk.gov.justice.digital.hmpps.personlocationapi.domain.DataSource
-import uk.gov.justice.digital.hmpps.personlocationapi.domain.IdGenerator.newUuid
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.DataSource
 import java.time.ZonedDateTime
 import java.util.UUID
 

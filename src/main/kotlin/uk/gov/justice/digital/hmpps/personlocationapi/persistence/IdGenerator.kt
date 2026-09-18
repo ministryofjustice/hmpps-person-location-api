@@ -1,4 +1,4 @@
-package uk.gov.justice.digital.hmpps.personlocationapi.domain
+package uk.gov.justice.digital.hmpps.personlocationapi.persistence
 
 import com.fasterxml.uuid.Generators
 import java.util.UUID

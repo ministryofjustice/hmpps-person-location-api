@@ -4,7 +4,6 @@ import io.awspring.cloud.sqs.annotation.SqsListener
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import tools.jackson.databind.json.JsonMapper
-import uk.gov.justice.digital.hmpps.transferschedulerapi.event.Notification
 
 @Component
 class DomainEventListener(

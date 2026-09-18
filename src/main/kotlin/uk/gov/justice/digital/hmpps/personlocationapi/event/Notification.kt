@@ -1,4 +1,4 @@
-package uk.gov.justice.digital.hmpps.transferschedulerapi.event
+package uk.gov.justice.digital.hmpps.personlocationapi.event
 
 import com.fasterxml.jackson.annotation.JsonAnyGetter
 import com.fasterxml.jackson.annotation.JsonAnySetter

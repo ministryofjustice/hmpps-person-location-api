@@ -7,3 +7,6 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+
+service:
+  api-base-url: "https://person-location-api-dev.hmpps.service.justice.gov.uk"

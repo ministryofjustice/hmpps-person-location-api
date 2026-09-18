@@ -11,6 +11,11 @@ import io.swagger.v3.oas.models.servers.Server
 import org.springframework.boot.info.BuildProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import java.time.LocalTime
+
+object OpenApiTags {
+  const val SYNC = "Sync"
+}
 
 @Configuration
 class OpenApiConfiguration(buildProperties: BuildProperties) {
@@ -41,7 +46,7 @@ class OpenApiConfiguration(buildProperties: BuildProperties) {
         ),
     )
     .addSecurityItem(SecurityRequirement().addList("PERSON_LOCATION_RO", listOf("read")))
-    .also { PrimitiveType.enablePartialTime() }
+    .also { PrimitiveType.customClasses()[LocalTime::class.java.name] = PrimitiveType.PARTIAL_TIME }
 }
 
 private fun SecurityScheme.addBearerJwtRequirement(role: String): SecurityScheme = type(SecurityScheme.Type.HTTP)

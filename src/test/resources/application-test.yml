@@ -27,7 +27,7 @@ db:
   server: "localhost:5432"
   name: "person_location"
   user: "person"
-  pass: "location"
+  pass: "l0c4710n"
 
 hmpps.sqs:
   provider: localstack
@@ -45,3 +45,8 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+
+service:
+  api-base-url: "http:localhost:8080"
+  domain-events:
+    poll-interval: PT0s

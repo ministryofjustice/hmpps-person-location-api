@@ -102,7 +102,6 @@ create table if not exists external_movement
     journey_id        uuid                   not null,
     stay_id           uuid                   not null,
     person_identifier varchar(7)             not null,
-    sequence          int                    not null,
     type              external_movement_type not null,
     reason            jsonb                  not null,
     occurred_at       timestamp              not null,
@@ -113,7 +112,6 @@ create table if not exists external_movement
     constraint pk_external_movement primary key (id),
     constraint fk_external_movement_journey foreign key (journey_id) references external_journey (id),
     constraint fk_external_movement_stay foreign key (stay_id) references prison_stay (id),
-    constraint uq_external_movement_sequence unique (journey_id, sequence) deferrable initially deferred,
     constraint uq_external_movement_legacy_id unique (legacy_id) deferrable initially deferred
 )
 ;
@@ -255,7 +253,6 @@ create table if not exists external_movement_audit
     id                uuid                   not null,
     version           int                    not null,
     journey_id        uuid                   not null,
-    sequence          int                    not null,
     stay_id           uuid                   not null,
     person_identifier varchar(7)             not null,
     type              external_movement_type not null,

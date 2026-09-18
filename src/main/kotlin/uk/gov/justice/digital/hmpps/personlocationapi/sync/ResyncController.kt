@@ -27,7 +27,7 @@ data class ResyncExternalMovementsRequest(val custodialSeries: List<ResyncCustod
 
 data class ResyncCustodialSeries(
   val custodialSeries: CustodialSeries,
-  val movements: List<ExternalMovement>,
+  val movements: List<ResyncExternalMovement>,
   val created: AtAndBy,
   val updated: AtAndBy?,
 )

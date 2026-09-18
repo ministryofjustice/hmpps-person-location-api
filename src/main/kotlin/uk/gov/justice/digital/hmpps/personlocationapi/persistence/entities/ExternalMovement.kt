@@ -39,10 +39,6 @@ abstract class ExternalMovement(
   var journey: ExternalJourney,
 
   @NotNull
-  @Column(name = "sequence", nullable = false)
-  var sequence: Int,
-
-  @NotNull
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "stay_id", nullable = false)
   var stay: PrisonStay,
@@ -95,7 +91,6 @@ abstract class ExternalMovement(
 @DiscriminatorValue(ExternalMovement.ARRIVAL)
 class Arrival(
   journey: ExternalJourney,
-  sequence: Int,
   stay: PrisonStay,
   personIdentifier: String,
   reason: MovementReason,
@@ -104,13 +99,12 @@ class Arrival(
   destination: Location?,
   notes: String?,
   legacyId: String?,
-) : ExternalMovement(journey, sequence, stay, personIdentifier, reason, occurredAt, origin, destination, notes, legacyId)
+) : ExternalMovement(journey, stay, personIdentifier, reason, occurredAt, origin, destination, notes, legacyId)
 
 @Entity
 @DiscriminatorValue(ExternalMovement.DEPARTURE)
 class Departure(
   journey: ExternalJourney,
-  sequence: Int,
   stay: PrisonStay,
   personIdentifier: String,
   reason: MovementReason,
@@ -119,4 +113,4 @@ class Departure(
   destination: Location?,
   notes: String?,
   legacyId: String?,
-) : ExternalMovement(journey, sequence, stay, personIdentifier, reason, occurredAt, origin, destination, notes, legacyId)
+) : ExternalMovement(journey, stay, personIdentifier, reason, occurredAt, origin, destination, notes, legacyId)

@@ -23,6 +23,8 @@ data class RequestContext(
   }
 }
 
+fun RequestContext.set() = apply { RequestContextHolder.setContext(this) }
+
 @Component
 class RequestContextHolder {
   companion object {

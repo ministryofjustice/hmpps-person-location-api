@@ -2,13 +2,13 @@ import jdk.jfr.internal.JVM.exclude
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-  id("uk.gov.justice.hmpps.gradle-spring-boot") version "11.0.9"
+  id("uk.gov.justice.hmpps.gradle-spring-boot") version "11.0.11"
   kotlin("plugin.spring") version "2.4.20"
   kotlin("plugin.jpa") version "2.4.20"
 }
 
-val hmppsKotlinVersion = "3.0.1"
-val sentryVersion = "8.56.0"
+val hmppsKotlinVersion = "3.0.3"
+val sentryVersion = "8.59.0"
 val springDocVersion = "3.1.1"
 val sqsStarterVersion = "7.4.1"
 val swaggerParserVersion = "2.1.48"

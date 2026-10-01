@@ -1,9 +1,9 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.integration.health
 
 import org.junit.jupiter.api.Test
-import uk.gov.justice.digital.hmpps.personlocationapi.integration.IntegrationTestBase
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.IntegrationTest
 
-class HealthCheckTest : IntegrationTestBase() {
+class HealthCheckTest : IntegrationTest() {
 
   @Test
   fun `Health page reports ok`() {

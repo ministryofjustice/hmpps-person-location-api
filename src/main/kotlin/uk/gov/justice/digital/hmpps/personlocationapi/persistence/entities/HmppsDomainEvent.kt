@@ -22,20 +22,20 @@ import java.util.UUID
 class HmppsDomainEvent(
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "event")
-  var event: DomainEvent<*>,
+  val event: DomainEvent<*>,
 
   @Column(name = "entity_id")
-  var entityId: UUID,
+  val entityId: UUID,
 
   @Id
   @Column(name = "id", nullable = false)
-  var id: UUID = event.id,
+  val id: UUID = event.id,
 ) {
   @Version
-  var version: Int? = null
+  val version: Int? = null
 
   @Column(name = "event_type")
-  var eventType: String = event.eventType
+  val eventType: String = event.eventType
 
   var published: Boolean = false
 }

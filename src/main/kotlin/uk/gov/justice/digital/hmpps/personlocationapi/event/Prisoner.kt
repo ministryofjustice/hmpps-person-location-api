@@ -5,7 +5,7 @@ data class PrisonerUpdatedInformation(
   val categoriesChanged: Set<String>,
 ) : AdditionalInformation {
   companion object {
-    val CATEGORIES_OF_INTEREST = setOf("PERSONAL_DETAILS", "LOCATION")
+    val CATEGORIES_OF_INTEREST = setOf("PERSONAL_DETAILS", "LOCATION", "STATUS")
   }
 }
 

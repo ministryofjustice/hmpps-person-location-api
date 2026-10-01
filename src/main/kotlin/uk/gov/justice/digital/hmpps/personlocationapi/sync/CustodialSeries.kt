@@ -2,6 +2,7 @@ package uk.gov.justice.digital.hmpps.personlocationapi.sync
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.swagger.v3.oas.annotations.media.Schema
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeries
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -20,5 +21,14 @@ data class CustodialSeries(
   override val legacyId: Long? = legacyBookingId
 
   @Schema(name = "SyncCustodialSeriesStatus")
-  enum class Status { OPEN, CLOSED }
+  enum class Status {
+    OPEN,
+    CLOSED,
+    ;
+
+    fun asEntityStatus() = when (this) {
+      CLOSED -> CustodialSeries.Status.CLOSED
+      OPEN -> CustodialSeries.Status.OPEN
+    }
+  }
 }

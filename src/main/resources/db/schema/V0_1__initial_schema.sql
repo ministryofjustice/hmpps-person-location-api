@@ -46,7 +46,8 @@ create table if not exists custodial_episode
     commenced_at      timestamp      not null,
     concluded_at      timestamp,
     constraint pk_custodial_episode primary key (id),
-    constraint fk_custodial_episode_series foreign key (series_id) references custodial_series (id)
+    constraint fk_custodial_episode_series foreign key (series_id) references custodial_series (id),
+    constraint ch_custodial_episode_commenced_concluded check ( concluded_at is null or concluded_at > commenced_at )
 )
 ;
 
@@ -61,11 +62,12 @@ create table if not exists prison_stay
     person_identifier varchar(7)         not null,
     prison_code       varchar(6)         not null,
     status            prison_stay_status not null,
-    is_active         boolean            not null,
     arrived_at        timestamp          not null,
     departed_at       timestamp,
+    is_active         boolean generated always as (departed_at is null) stored,
     constraint pk_prison_stay primary key (id),
-    constraint fk_prison_stay_episode foreign key (episode_id) references custodial_episode (id)
+    constraint fk_prison_stay_episode foreign key (episode_id) references custodial_episode (id),
+    constraint ch_prison_stay_arrived_departed check ( departed_at is null or departed_at > arrived_at )
 )
 ;
 

@@ -32,6 +32,8 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
+        type:
+          preferred_enum_jdbc_type: 1111
         jdbc:
           lob.non_contextual_creation: true
           batch_size: 1000

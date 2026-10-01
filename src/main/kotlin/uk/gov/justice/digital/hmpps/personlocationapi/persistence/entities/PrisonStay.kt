@@ -31,9 +31,6 @@ class PrisonStay(
   @Column(name = "status", columnDefinition = "prison_stay_status", nullable = false)
   var status: Status,
 
-  @Column(name = "is_active", nullable = false)
-  var isActive: Boolean,
-
   @Column(name = "arrived_at", nullable = false)
   var arrivedAt: LocalDateTime,
 
@@ -47,6 +44,8 @@ class PrisonStay(
   @Version
   @Column(name = "version", nullable = false)
   var version: Int? = null
+
+  fun isActive() = departedAt == null
 
   enum class Status { RESIDENT, IN_TRANSIT_EXTERNAL, TRANSFERRED_OUT, RELEASED }
 }

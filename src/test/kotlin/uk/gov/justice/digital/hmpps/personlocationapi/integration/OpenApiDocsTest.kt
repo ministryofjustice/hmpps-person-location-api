@@ -15,7 +15,7 @@ import org.springframework.http.MediaType
 class OpenApiDocsTest(
   @Autowired private val buildProperties: BuildProperties,
   @LocalServerPort private val port: Int = 0,
-) : IntegrationTestBase() {
+) : IntegrationTest() {
 
   @Test
   fun `open api docs are available`() {

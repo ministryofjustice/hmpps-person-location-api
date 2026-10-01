@@ -2,7 +2,7 @@ package uk.gov.justice.digital.hmpps.personlocationapi.integration
 
 import org.junit.jupiter.api.Test
 
-class NotFoundTest : IntegrationTestBase() {
+class NotFoundTest : IntegrationTest() {
 
   @Test
   fun `Resources that aren't found should return 404 - test of the exception handler`() {

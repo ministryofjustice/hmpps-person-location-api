@@ -2,6 +2,7 @@ package uk.gov.justice.digital.hmpps.personlocationapi.sync
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.swagger.v3.oas.annotations.media.Schema
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Location
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.MovementReason
 import java.time.LocalDateTime
@@ -19,12 +20,21 @@ data class ExternalMovement(
   val from: Location,
   val to: Location?,
   val notes: String?,
-  val journey: ExternalJourney?,
+  val journey: ExternalJourney,
 ) : StringLegacyIdRequest {
   @JsonIgnore
   override val legacyId: String? =
     if (legacyBookingId == null || legacySequenceNumber == null) null else "${legacyBookingId}_$legacySequenceNumber"
 
   @Schema(name = "SyncExternalMovementType")
-  enum class MovementType { ARRIVAL, DEPARTURE }
+  enum class MovementType {
+    ARRIVAL,
+    DEPARTURE,
+    ;
+
+    fun asEntityType() = when (this) {
+      ARRIVAL -> ExternalMovement.Type.ARRIVAL
+      DEPARTURE -> ExternalMovement.Type.DEPARTURE
+    }
+  }
 }

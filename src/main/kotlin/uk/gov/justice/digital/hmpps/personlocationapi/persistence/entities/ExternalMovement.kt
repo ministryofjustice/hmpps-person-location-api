@@ -1,117 +1,183 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities
 
 import jakarta.persistence.Column
-import jakarta.persistence.DiscriminatorColumn
-import jakarta.persistence.DiscriminatorType
-import jakarta.persistence.DiscriminatorValue
+import jakarta.persistence.Convert
 import jakarta.persistence.Entity
+import jakarta.persistence.FetchType
 import jakarta.persistence.Id
-import jakarta.persistence.Inheritance
-import jakarta.persistence.InheritanceType
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
+import jakarta.persistence.PostLoad
 import jakarta.persistence.Table
+import jakarta.persistence.Transient
 import jakarta.persistence.Version
 import jakarta.validation.constraints.Size
+import org.hibernate.annotations.JdbcType
 import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType
 import org.hibernate.envers.Audited
 import org.hibernate.type.SqlTypes
-import org.springframework.data.jpa.repository.JpaRepository
-import software.amazon.awssdk.services.sns.endpoints.internal.Value
+import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyDestination
+import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyJourneyDetails
+import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyNotes
+import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyOccurredAt
+import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyOrigin
+import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyReason
+import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyType
+import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.MovementAction
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.DomainEventProducer
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Location
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.MovementReason
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReference
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReferenceConverter
 import java.time.LocalDateTime
 import java.util.UUID
 
 @Audited
 @Entity
 @Table(name = "external_movement")
-@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-@DiscriminatorColumn(name = "type", discriminatorType = DiscriminatorType.STRING)
-abstract class ExternalMovement(
-  personIdentifier: String,
+final class ExternalMovement(
+  series: CustodialSeries,
+  journeyType: ExternalJourney.Type,
+  movementType: Type,
   reason: MovementReason,
   occurredAt: LocalDateTime,
   origin: Location,
   destination: Location?,
   notes: String?,
+  scheduleReference: ExternalReference?,
   legacyId: String?,
   id: UUID = newUuid(),
 ) : Identifiable,
   DomainEventProducer {
   @Id
   @Column(name = "id", nullable = false)
-  final override var id: UUID = id
+  override var id: UUID = id
     private set
 
   @Version
   @Column(name = "version", nullable = false)
-  final override var version: Int? = null
+  override var version: Int? = null
     private set
+
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "series_id", nullable = false)
+  var series: CustodialSeries = series
+    private set(value) {
+      field = value
+      personIdentifier = value.personIdentifier
+    }
 
   @Size(max = 7)
   @Column(name = "person_identifier", nullable = false, length = 7)
-  final var personIdentifier: String = personIdentifier
+  var personIdentifier: String = series.personIdentifier
+    private set
+
+  @JdbcType(PostgreSQLEnumJdbcType::class)
+  @Column(name = "journey_type", columnDefinition = "external_journey_type", nullable = false)
+  var journeyType: ExternalJourney.Type = journeyType
+    private set
+
+  @JdbcType(PostgreSQLEnumJdbcType::class)
+  @Column(name = "movement_type", columnDefinition = "external_movement_type", nullable = false)
+  var movementType: Type = movementType
     private set
 
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "reason", nullable = false)
-  final var reason: MovementReason = reason
+  var reason: MovementReason = reason
     private set
 
   @Column(name = "occurred_at", nullable = false)
-  final var occurredAt: LocalDateTime = occurredAt
+  var occurredAt: LocalDateTime = occurredAt
     private set
 
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "origin", nullable = false)
-  final var origin: Location = origin
+  var origin: Location = origin
     private set
 
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "destination")
-  final var destination: Location? = destination
+  var destination: Location? = destination
     private set
 
   @Column(name = "notes", length = Integer.MAX_VALUE)
-  final var notes: String? = notes
+  var notes: String? = notes
+    private set
+
+  @Convert(converter = ExternalReferenceConverter::class)
+  @Column(name = "schedule_reference")
+  var scheduleReference: ExternalReference? = scheduleReference
     private set
 
   @Column(name = "legacy_id")
-  final var legacyId: String? = legacyId
+  var legacyId: String? = legacyId
     private set
 
-  companion object {
-    protected const val ARRIVAL = "ARRIVAL"
-    protected const val DEPARTURE = "DEPARTURE"
+  @Transient
+  private var appliedActions: List<MovementAction> = listOf()
+
+  @PostLoad
+  private fun load() {
+    appliedActions = listOf()
   }
-}
 
-@Entity
-@DiscriminatorValue(ExternalMovement.ARRIVAL)
-class Arrival(
-  personIdentifier: String,
-  reason: MovementReason,
-  occurredAt: LocalDateTime,
-  origin: Location,
-  destination: Location?,
-  notes: String?,
-  legacyId: String?,
-) : ExternalMovement(personIdentifier, reason, occurredAt, origin, destination, notes, legacyId)
+  fun applySeries(series: CustodialSeries) = apply {
+    this.series = series
+  }
 
-@Entity
-@DiscriminatorValue(ExternalMovement.DEPARTURE)
-class Departure(
-  personIdentifier: String,
-  reason: MovementReason,
-  occurredAt: LocalDateTime,
-  origin: Location,
-  destination: Location?,
-  notes: String?,
-  legacyId: String?,
-) : ExternalMovement(personIdentifier, reason, occurredAt, origin, destination, notes, legacyId)
+  fun applyType(action: ApplyType) = apply {
+    if (action changes this) {
+      movementType = action.type
+      appliedActions += action
+    }
+  }
 
-interface ExternalMovementRepository : JpaRepository<ExternalMovement, UUID> {
-  fun findByLegacyId(legacyId: String): ExternalMovement?
+  fun applyJourneyDetails(action: ApplyJourneyDetails) = apply {
+    if (action changes this) {
+      journeyType = action.journeyType
+      scheduleReference = action.scheduleReference
+      appliedActions += action
+    }
+  }
+
+  fun applyReason(action: ApplyReason) = apply {
+    if (action changes this) {
+      reason = action.reason
+      appliedActions += action
+    }
+  }
+
+  fun applyOccurredAt(action: ApplyOccurredAt) = apply {
+    if (action changes this) {
+      occurredAt = action.occurredAt
+      appliedActions += action
+    }
+  }
+
+  fun applyOrigin(action: ApplyOrigin) = apply {
+    if (action changes this) {
+      origin = action.origin
+      appliedActions += action
+    }
+  }
+
+  fun applyDestination(action: ApplyDestination) = apply {
+    if (action changes this) {
+      destination = action.destination
+      appliedActions += action
+    }
+  }
+
+  fun applyNotes(action: ApplyNotes) = apply {
+    if (action changes this) {
+      notes = action.notes
+      appliedActions += action
+    }
+  }
+
+  enum class Type { ARRIVAL, DEPARTURE }
 }

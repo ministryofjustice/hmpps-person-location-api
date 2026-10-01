@@ -3,11 +3,11 @@ package uk.gov.justice.digital.hmpps.personlocationapi.integration.health
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.info.BuildProperties
-import uk.gov.justice.digital.hmpps.personlocationapi.integration.IntegrationTestBase
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.IntegrationTest
 
 class InfoTest(
   @Autowired private val buildProperties: BuildProperties,
-) : IntegrationTestBase() {
+) : IntegrationTest() {
   @Test
   fun `Info page is accessible`() {
     webTestClient.get()

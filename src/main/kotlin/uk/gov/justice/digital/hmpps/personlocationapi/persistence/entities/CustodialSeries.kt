@@ -6,8 +6,13 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import jakarta.persistence.Version
 import jakarta.validation.constraints.Size
+import org.hibernate.annotations.JdbcType
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType
 import org.hibernate.envers.Audited
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.findByIdOrNull
+import uk.gov.justice.digital.hmpps.personlocationapi.exception.NotFoundException
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
 import java.time.LocalDateTime
@@ -43,6 +48,7 @@ class CustodialSeries(
   final var personIdentifier: String = personIdentifier
     private set
 
+  @JdbcType(PostgreSQLEnumJdbcType::class)
   @Column(name = "status", columnDefinition = "custodial_series_status", nullable = false)
   final var status: Status = status
     private set
@@ -72,8 +78,52 @@ class CustodialSeries(
     private set
 
   enum class Status { OPEN, CLOSED }
+
+  fun applyPerson(personIdentifier: String) = apply {
+    this.personIdentifier = personIdentifier
+  }
+
+  fun applySeries(isActive: Boolean, openedAt: LocalDateTime, closedAt: LocalDateTime?) = apply {
+    this.isActive = isActive
+    status = if (closedAt == null) Status.OPEN else Status.CLOSED
+    this.openedAt = openedAt
+    this.closedAt = closedAt
+  }
+
+  fun applyNotes(notes: String?) = apply {
+    this.notes = notes
+  }
+
+  fun applyLegacyIdentifiers(legacyId: Long?, legacyBookingReference: String?) = apply {
+    this.legacyId = legacyId
+    this.legacyBookingReference = legacyBookingReference
+  }
 }
 
 interface CustodialSeriesRepository : JpaRepository<CustodialSeries, UUID> {
+  @Query(
+    """
+    select cs.id from CustodialSeries cs
+    where cs.personIdentifier = :personIdentifier
+    union
+    select cs.id from CustodialSeries cs
+    where cs.legacyId in :seriesLegacyIds
+    union
+    select em.series.id from ExternalMovement em
+    where em.id in (:movementIds)
+    union
+    select em.series.id from ExternalMovement em
+    where em.legacyId in (:movementLegacyIds)
+  """,
+  )
+  fun findSeriesIds(
+    personIdentifier: String,
+    seriesLegacyIds: Set<Long>,
+    movementIds: Set<UUID>,
+    movementLegacyIds: Set<String>,
+  ): Set<UUID>
+
   fun findByLegacyId(legacyId: Long): CustodialSeries?
 }
+
+fun CustodialSeriesRepository.getSeries(id: UUID): CustodialSeries = findByIdOrNull(id) ?: throw NotFoundException("Custodial Series not found")

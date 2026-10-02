@@ -7,8 +7,13 @@ import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.Appl
 import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyOrigin
 import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyReason
 import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyType
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement.Type.ARRIVAL
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement.Type.DEPARTURE
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.CustodialSeries
+import uk.gov.justice.digital.hmpps.personlocationapi.sync.ExternalJourney
+import uk.gov.justice.digital.hmpps.personlocationapi.sync.ExternalJourney.JourneyType
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.ExternalMovement
+import uk.gov.justice.digital.hmpps.personlocationapi.sync.ExternalMovement.MovementType
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeries as SeriesEntity
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement as MovementEntity
 
@@ -53,4 +58,47 @@ fun MovementEntity.updateFrom(series: SeriesEntity, request: ExternalMovement) =
   applyDestination(ApplyDestination(request.to))
   applyNotes(ApplyNotes(request.notes))
   applyLegacyId(request.legacyId)
+}
+
+fun SeriesEntity.toSyncModel() = CustodialSeries(
+  legacyId,
+  legacyBookingReference,
+  id,
+  when (status) {
+    SeriesEntity.Status.OPEN -> CustodialSeries.Status.OPEN
+    SeriesEntity.Status.CLOSED -> CustodialSeries.Status.CLOSED
+  },
+  isActive,
+  openedAt,
+  closedAt,
+  notes,
+)
+
+fun MovementEntity.toSyncModel(): ExternalMovement {
+  val legacyIdParts = syncIdsFromLegacyId()
+  return ExternalMovement(
+    id,
+    series.id,
+    legacyIdParts?.first,
+    legacyIdParts?.second,
+    when (movementType) {
+      ARRIVAL -> MovementType.ARRIVAL
+      DEPARTURE -> MovementType.DEPARTURE
+    },
+    reason,
+    occurredAt,
+    origin,
+    destination,
+    notes,
+    ExternalJourney(JourneyType.valueOf(journeyType.name), scheduleReference),
+  )
+}
+
+fun MovementEntity.syncIdsFromLegacyId(): Pair<Long, Int>? {
+  val parts = legacyId?.split("_")
+  return if (parts?.size != 2) {
+    null
+  } else {
+    parts[0].toLong() to parts[1].toInt()
+  }
 }

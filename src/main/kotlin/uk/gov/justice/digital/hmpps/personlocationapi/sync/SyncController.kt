@@ -15,6 +15,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.access.Roles
 import uk.gov.justice.digital.hmpps.personlocationapi.config.OpenApiTags
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.internal.CustodialSeriesSync
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.internal.ExternalMovementSync
+import uk.gov.justice.digital.hmpps.personlocationapi.sync.internal.RetrieveForSync
 import java.util.UUID
 
 @Tag(name = OpenApiTags.SYNC)
@@ -24,6 +25,7 @@ import java.util.UUID
 class SyncController(
   private val series: CustodialSeriesSync,
   private val movement: ExternalMovementSync,
+  private val retrieve: RetrieveForSync,
 ) {
   @PutMapping("/custodial-series/{personIdentifier}")
   fun syncCustodialSeries(
@@ -32,7 +34,7 @@ class SyncController(
   ): ReferenceId = series.sync(personIdentifier, request)
 
   @GetMapping("/custodial-series/{id}")
-  fun getCustodialSeries(@PathVariable id: UUID): CustodialSeries = TODO()
+  fun getCustodialSeries(@PathVariable id: UUID): CustodialSeries = retrieve.series(id)
 
   @DeleteMapping("/custodial-series/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -47,7 +49,7 @@ class SyncController(
   ): ReferenceId = movement.sync(personIdentifier, request)
 
   @GetMapping("/external-movements/{id}")
-  fun getExternalMovement(@PathVariable id: UUID): ExternalMovement = TODO()
+  fun getExternalMovement(@PathVariable id: UUID): ExternalMovement = retrieve.movement(id)
 
   @DeleteMapping("/external-movements/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)

@@ -1,5 +1,10 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.integration
 
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReference
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReferenceEntity
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReferenceService
+import java.util.UUID
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicLong
 
@@ -22,4 +27,10 @@ object DataGenerator {
       prisonCode(attempts - 1)
     }
   }
+
+  fun externalReference(
+    entity: ExternalReferenceEntity = ExternalReferenceEntity.entries.random(),
+    service: ExternalReferenceService = entity.services.random(),
+    uuid: UUID = newUuid(),
+  ) = ExternalReference(service, entity, uuid)
 }

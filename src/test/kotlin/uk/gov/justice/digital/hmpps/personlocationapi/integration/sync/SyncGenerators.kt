@@ -1,5 +1,6 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.integration.sync
 
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.externalReference
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.newId
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.prisonCode
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.username
@@ -15,6 +16,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.sync.CustodialSeries.Statu
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.ExternalJourney
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.ExternalMovement.MovementType
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.SyncCustodialSeriesRequest
+import uk.gov.justice.digital.hmpps.personlocationapi.sync.SyncExternalMovementRequest
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.SyncUser
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -56,7 +58,7 @@ fun syncMovement(
   to: Location? = if (type == MovementType.DEPARTURE) null else prison(),
   notes: String? = word(30),
   journeyType: ExternalJourney.JourneyType = ExternalJourney.JourneyType.entries.random(),
-  scheduleReference: ExternalReference? = null,
+  scheduleReference: ExternalReference? = externalReference(),
 ) = SyncExternalMovement(
   dpsId,
   dpsCustodySeriesId,
@@ -76,3 +78,9 @@ fun syncSeriesRequest(
   syncUser: SyncUser = syncUser(),
   occurredAt: LocalDateTime = LocalDateTime.now(),
 ) = SyncCustodialSeriesRequest(occurredAt, syncUser, request)
+
+fun syncMovementRequest(
+  request: SyncExternalMovement = syncMovement(),
+  syncUser: SyncUser = syncUser(),
+  occurredAt: LocalDateTime = LocalDateTime.now(),
+) = SyncExternalMovementRequest(occurredAt, syncUser, request)

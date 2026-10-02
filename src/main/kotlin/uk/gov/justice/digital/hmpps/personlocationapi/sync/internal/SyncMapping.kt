@@ -52,4 +52,5 @@ fun MovementEntity.updateFrom(series: SeriesEntity, request: ExternalMovement) =
   applyOrigin(ApplyOrigin(request.from))
   applyDestination(ApplyDestination(request.to))
   applyNotes(ApplyNotes(request.notes))
+  applyLegacyId(request.legacyId)
 }

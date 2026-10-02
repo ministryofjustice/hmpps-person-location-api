@@ -46,7 +46,7 @@ class ExternalMovementsResync(
     }
 
     val mappings = request.custodialSeries.map { it.resync(personIdentifier, seriesProvider, movementProvider, maProvider) }
-    removeNotInResync(existingMovements.values, existingSeries.values)
+    removeNotInResync(mappings, existingMovements.values, existingSeries.values)
     return ResyncResponse(mappings)
   }
 
@@ -100,11 +100,15 @@ class ExternalMovementsResync(
   }
 
   private fun removeNotInResync(
+    mappings: List<CustodialSeriesMapping>,
     movements: Collection<ExternalMovement>,
     series: Collection<CustodialSeries>,
   ) {
-    val movementIds = movements.map { it.id }
-    val seriesIds = series.map { it.id }
+    val (seriesIds, movementIds) = mappings.fold(Pair(mutableSetOf<UUID>(), mutableSetOf<UUID>())) { (s, m), ser ->
+      s.add(ser.dpsId)
+      ser.movements.mapTo(m) { it.dpsId }
+      s to m
+    }
     movementRepository.deleteAll(movements.filter { it.id !in movementIds })
     seriesRepository.deleteAll(series.filter { it.id !in seriesIds })
   }

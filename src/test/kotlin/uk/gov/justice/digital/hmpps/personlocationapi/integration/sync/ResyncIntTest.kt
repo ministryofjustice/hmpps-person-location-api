@@ -1,15 +1,25 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.integration.sync
 
 import org.assertj.core.api.Assertions.assertThat
+import org.hibernate.envers.RevisionType
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.data.repository.findByIdOrNull
 import uk.gov.justice.digital.hmpps.personlocationapi.access.Roles
+import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext
+import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext.Companion.SYSTEM_USERNAME
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.newId
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.personIdentifier
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.username
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.word
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.IntegrationTest
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.CustodialSeriesOperations
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.CustodialSeriesOperationsImpl.Companion.custodialSeries
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.ExternalMovementOperations
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.ExternalMovementOperationsImpl.Companion.externalMovement
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeries
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.DataSource
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.AtAndBy
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.ResyncCustodialSeries
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.ResyncExternalMovement
@@ -69,6 +79,159 @@ class ResyncIntTest(
     val moMsa = requireNotNull(msaRepository.findByIdOrNull(mov.id))
     assertThat(moMsa.createdBy).isEqualTo(movRequest.created.by)
     assertThat(moMsa.modifiedBy).isEqualTo(movRequest.modified!!.by)
+
+    verifyAudit(
+      cs,
+      RevisionType.ADD,
+      setOf(
+        CustodialSeries::class.simpleName!!,
+        ExternalMovement::class.simpleName!!,
+      ),
+      RESYNC_CONTEXT,
+    )
+    verifyEventPublications(cs, setOf())
+  }
+
+  @Test
+  fun `200 ok can remove data`() {
+    val series = givenSeries(custodialSeries())
+    val movement = givenMovement(externalMovement(series))
+    val request = resyncRequest(listOf())
+    val res = resync(series.personIdentifier, request).successResponse<ResyncResponse>()
+    assertThat(res.custodialSeries).isEmpty()
+
+    assertThat(findSeries(series.id)).isNull()
+    assertThat(findMovement(movement.id)).isNull()
+
+    verifyAudit(
+      series,
+      RevisionType.DEL,
+      setOf(
+        CustodialSeries::class.simpleName!!,
+        ExternalMovement::class.simpleName!!,
+      ),
+      RESYNC_CONTEXT,
+    )
+    verifyAudit(
+      movement,
+      RevisionType.DEL,
+      setOf(
+        CustodialSeries::class.simpleName!!,
+        ExternalMovement::class.simpleName!!,
+      ),
+      RESYNC_CONTEXT,
+    )
+    verifyEventPublications(series, setOf())
+  }
+
+  @Test
+  fun `200 ok can merge data`() {
+    val personIdentifier = personIdentifier()
+    val series = givenSeries(custodialSeries(personIdentifier))
+    val seriesWithMovement = givenSeries(custodialSeries(personIdentifier))
+    val movement = givenMovement(externalMovement(seriesWithMovement))
+
+    val request = resyncRequest(
+      listOf(
+        resyncSeries(
+          syncSeries(dpsId = seriesWithMovement.id),
+          movements = listOf(resyncMovement(syncMovement(dpsId = movement.id))),
+        ),
+        resyncSeries(),
+      ),
+    )
+    val res = resync(series.personIdentifier, request).successResponse<ResyncResponse>()
+    assertThat(res.custodialSeries).hasSize(2)
+
+    assertThat(findSeries(series.id)).isNull()
+
+    val modRequest = request.custodialSeries.first()
+    val modSeries = requireNotNull(findSeries(seriesWithMovement.id))
+    modSeries verifyAgainst modRequest.custodialSeries
+    val modMove = requireNotNull(findMovement(movement.id))
+    modMove verifyAgainst modRequest.movements.single().movement
+
+    val newSeries = requireNotNull(findSeries(res.custodialSeries.first { it.dpsId != modSeries.id }.dpsId))
+    newSeries verifyAgainst request.custodialSeries.last().custodialSeries
+
+    verifyAudit(
+      series,
+      RevisionType.DEL,
+      setOf(
+        CustodialSeries::class.simpleName!!,
+        ExternalMovement::class.simpleName!!,
+      ),
+      RESYNC_CONTEXT,
+    )
+    verifyAudit(
+      seriesWithMovement,
+      RevisionType.MOD,
+      setOf(
+        CustodialSeries::class.simpleName!!,
+        ExternalMovement::class.simpleName!!,
+      ),
+      RESYNC_CONTEXT,
+    )
+    verifyAudit(
+      movement,
+      RevisionType.MOD,
+      setOf(
+        CustodialSeries::class.simpleName!!,
+        ExternalMovement::class.simpleName!!,
+      ),
+      RESYNC_CONTEXT,
+    )
+    verifyAudit(
+      newSeries,
+      RevisionType.ADD,
+      setOf(
+        CustodialSeries::class.simpleName!!,
+        ExternalMovement::class.simpleName!!,
+      ),
+      RESYNC_CONTEXT,
+    )
+
+    verifyEventPublications(series, setOf())
+  }
+
+  @Test
+  fun `200 ok can re-migrate dat without dps ids`() {
+    val series = givenSeries(custodialSeries(legacyId = newId(), legacyBookingReference = word(6).uppercase()))
+    val movBookingId = newId()
+    val movSeq = newId().toInt()
+    val movement = givenMovement(externalMovement(series, legacyId = "${movBookingId}_$movSeq"))
+
+    val request = resyncRequest(
+      listOf(
+        resyncSeries(
+          syncSeries(
+            legacyBookingId = series.legacyId!!,
+          ),
+          movements = listOf(resyncMovement(syncMovement(legacyBookingId = movBookingId, legacySequenceNumber = movSeq))),
+        ),
+      ),
+    )
+
+    val res = resync(series.personIdentifier, request).successResponse<ResyncResponse>()
+    assertThat(res.custodialSeries).hasSize(1)
+
+    val modRequest = request.custodialSeries.single()
+    val modSeries = requireNotNull(findSeries(series.id))
+    modSeries verifyAgainst modRequest.custodialSeries
+    val modMovement = requireNotNull(findMovement(movement.id))
+    modMovement verifyAgainst modRequest.movements.single().movement
+
+    verifyAudit(
+      modSeries,
+      RevisionType.MOD,
+      setOf(
+        CustodialSeries::class.simpleName!!,
+        ExternalMovement::class.simpleName!!,
+      ),
+      RESYNC_CONTEXT,
+    )
+
+    verifyEventPublications(series, setOf())
   }
 
   private fun resync(
@@ -84,6 +247,8 @@ class ResyncIntTest(
 
   companion object {
     const val RESYNC = "/resync/external-movements/{personIdentifier}"
+    private val RESYNC_CONTEXT =
+      RequestContext(username = SYSTEM_USERNAME, source = DataSource.NOMIS, reason = null, caseloadId = null)
 
     private fun resyncMovement(
       movement: SyncExternalMovement = syncMovement(),

@@ -179,5 +179,9 @@ final class ExternalMovement(
     }
   }
 
+  fun applyLegacyId(legacyId: String?) = apply {
+    this.legacyId = legacyId
+  }
+
   enum class Type { ARRIVAL, DEPARTURE }
 }

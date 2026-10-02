@@ -9,6 +9,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.context.set
 import uk.gov.justice.digital.hmpps.personlocationapi.exception.ConflictException
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeriesRepository
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.DataSource
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.ReferenceId
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.SyncCustodialSeriesRequest
 import java.util.UUID
@@ -20,8 +21,8 @@ class CustodialSeriesSync(
   private val movementRepository: ExternalMovementRepository,
 ) {
   fun sync(personIdentifier: String, request: SyncCustodialSeriesRequest): ReferenceId = with(request) {
-    RequestContext.get()
-      .copy(username = syncUser.username, requestAt = occurredAt, caseloadId = syncUser.activeCaseloadId).set()
+    RequestContext(username = syncUser.username, requestAt = occurredAt, caseloadId = syncUser.activeCaseloadId, source = DataSource.NOMIS)
+      .set()
 
     val series = (
       custodialSeries.dpsId?.let { seriesRepository.findByIdOrNull(it) }
@@ -34,7 +35,7 @@ class CustodialSeriesSync(
 
   fun delete(id: UUID) {
     seriesRepository.findByIdOrNull(id)?.let { series ->
-      RequestContext.get().copy(username = SYSTEM_USERNAME).set()
+      RequestContext(username = SYSTEM_USERNAME, source = DataSource.NOMIS).set()
       if (movementRepository.countBySeriesId(series.id) > 0) {
         throw ConflictException("Custodial series cannot be deleted with movements")
       } else {

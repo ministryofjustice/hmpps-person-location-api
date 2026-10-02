@@ -1,7 +1,6 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.integration.config
 
 import org.springframework.data.repository.findByIdOrNull
-import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.newId
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.personIdentifier
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.word
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
@@ -33,8 +32,8 @@ class CustodialSeriesOperationsImpl(
       openedAt: LocalDateTime = LocalDateTime.now().minusDays(1),
       closedAt: LocalDateTime? = null,
       notes: String? = word(10),
-      legacyBookingReference: String?,
-      legacyId: Long? = newId(),
+      legacyBookingReference: String? = null,
+      legacyId: Long? = null,
       id: UUID = newUuid(),
     ): CustodialSeriesProvider = {
       CustodialSeries(

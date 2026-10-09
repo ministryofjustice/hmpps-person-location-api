@@ -3,8 +3,9 @@ package uk.gov.justice.digital.hmpps.personlocationapi.sync.internal
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext
-import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext.Companion.SYSTEM_USERNAME
 import uk.gov.justice.digital.hmpps.personlocationapi.context.set
+import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.InternalEventEmitter
+import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.RefreshPersonMovementIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeries
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeriesRepository
@@ -25,9 +26,10 @@ class ExternalMovementsResync(
   private val seriesRepository: CustodialSeriesRepository,
   private val movementRepository: ExternalMovementRepository,
   private val msa: MigrationSystemAuditRepository,
+  private val iee: InternalEventEmitter,
 ) {
   fun all(personIdentifier: String, request: ResyncExternalMovementsRequest): ResyncResponse {
-    RequestContext.get().copy(username = SYSTEM_USERNAME, source = DataSource.NOMIS, migratingData = true).set()
+    RequestContext(source = DataSource.NOMIS, migratingData = true).set()
     val (legacySeriesIds, seriesIds) = request.seriesIds()
     val (legacyMovementIds, movementIds) = request.movementIds()
     val existingSeries = findAllSeries(personIdentifier, seriesIds, legacySeriesIds, movementIds, legacyMovementIds)
@@ -47,6 +49,7 @@ class ExternalMovementsResync(
 
     val mappings = request.custodialSeries.map { it.resync(personIdentifier, seriesProvider, movementProvider, maProvider) }
     removeNotInResync(mappings, existingMovements.values, existingSeries.values)
+    iee.publishInternalEvent(RefreshPersonMovementIntervals(personIdentifier))
     return ResyncResponse(mappings)
   }
 

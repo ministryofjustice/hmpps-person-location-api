@@ -13,7 +13,7 @@ import org.hibernate.type.SqlTypes
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.QueryHints
-import uk.gov.justice.digital.hmpps.personlocationapi.event.DomainEvent
+import uk.gov.justice.digital.hmpps.personlocationapi.event.domain.DomainEvent
 import java.util.UUID
 
 @Audited

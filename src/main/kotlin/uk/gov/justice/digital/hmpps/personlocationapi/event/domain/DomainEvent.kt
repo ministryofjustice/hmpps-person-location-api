@@ -1,4 +1,4 @@
-package uk.gov.justice.digital.hmpps.personlocationapi.event
+package uk.gov.justice.digital.hmpps.personlocationapi.event.domain
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonSubTypes

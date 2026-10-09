@@ -79,6 +79,6 @@ class SyncDeleteMovementIntTest(
 
   companion object {
     const val DELETE_URL = "/sync/external-movements/{id}"
-    fun syncContext() = RequestContext(username = SYSTEM_USERNAME, caseloadId = null, source = DataSource.NOMIS)
+    fun syncContext() = RequestContext(source = DataSource.NOMIS)
   }
 }

@@ -1,12 +1,11 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.context
 
 import org.springframework.stereotype.Component
-import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext.Companion.SYSTEM_USERNAME
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.DataSource
 import java.time.LocalDateTime
 
 data class RequestContext(
-  val username: String,
+  val username: String = SYSTEM_USERNAME,
   val requestAt: LocalDateTime = LocalDateTime.now(),
   val reason: String? = null,
   val source: DataSource = DataSource.DPS,
@@ -28,8 +27,7 @@ fun RequestContext.set() = apply { RequestContextHolder.setContext(this) }
 @Component
 class RequestContextHolder {
   companion object {
-    private var context: ThreadLocal<RequestContext> =
-      ThreadLocal.withInitial { RequestContext(SYSTEM_USERNAME) }
+    private var context: ThreadLocal<RequestContext> = ThreadLocal.withInitial { RequestContext() }
 
     internal fun getContext(): RequestContext = context.get()
     internal fun setContext(rc: RequestContext) {

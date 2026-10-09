@@ -1,9 +1,13 @@
-package uk.gov.justice.digital.hmpps.personlocationapi.event
+package uk.gov.justice.digital.hmpps.personlocationapi.event.domain
 
 import io.awspring.cloud.sqs.annotation.SqsListener
+import io.sentry.Sentry
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import tools.jackson.databind.json.JsonMapper
+import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext
+import uk.gov.justice.digital.hmpps.personlocationapi.context.set
+import uk.gov.justice.digital.hmpps.personlocationapi.event.Notification
 
 @Component
 class DomainEventListener(
@@ -12,7 +16,14 @@ class DomainEventListener(
 
   @SqsListener("hmppsdomaineventsqueue", factory = "hmppsQueueContainerFactoryProxy")
   fun handleDomainEvent(notification: Notification) {
-    LOG.debug("Received domain event: {}", notification.eventType)
+    try {
+      RequestContext().set()
+    } catch (ex: Exception) {
+      Sentry.captureException(ex)
+      throw ex
+    } finally {
+      RequestContext.clear()
+    }
   }
 
   companion object {

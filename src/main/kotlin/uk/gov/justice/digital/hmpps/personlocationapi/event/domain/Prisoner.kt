@@ -1,4 +1,4 @@
-package uk.gov.justice.digital.hmpps.personlocationapi.event
+package uk.gov.justice.digital.hmpps.personlocationapi.event.domain
 
 data class PrisonerUpdatedInformation(
   val nomsNumber: String,

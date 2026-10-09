@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.data.repository.findByIdOrNull
 import uk.gov.justice.digital.hmpps.personlocationapi.access.Roles
 import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext
-import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext.Companion.SYSTEM_USERNAME
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.newId
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.personIdentifier
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.username
@@ -195,7 +194,7 @@ class ResyncIntTest(
   }
 
   @Test
-  fun `200 ok can re-migrate dat without dps ids`() {
+  fun `200 ok can re-migrate data without dps ids`() {
     val series = givenSeries(custodialSeries(legacyId = newId(), legacyBookingReference = word(6).uppercase()))
     val movBookingId = newId()
     val movSeq = newId().toInt()
@@ -247,8 +246,7 @@ class ResyncIntTest(
 
   companion object {
     const val RESYNC = "/resync/external-movements/{personIdentifier}"
-    private val RESYNC_CONTEXT =
-      RequestContext(username = SYSTEM_USERNAME, source = DataSource.NOMIS, reason = null, caseloadId = null)
+    private val RESYNC_CONTEXT = RequestContext(source = DataSource.NOMIS)
 
     private fun resyncMovement(
       movement: SyncExternalMovement = syncMovement(),

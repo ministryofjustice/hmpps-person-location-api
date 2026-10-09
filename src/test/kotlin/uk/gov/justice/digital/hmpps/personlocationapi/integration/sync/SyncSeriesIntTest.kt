@@ -78,6 +78,6 @@ class SyncSeriesIntTest(
 
   companion object {
     const val SYNC = "/sync/custodial-series/{personIdentifier}"
-    fun syncContext(syncUser: SyncUser) = RequestContext.get().copy(username = syncUser.username, caseloadId = syncUser.activeCaseloadId, source = DataSource.NOMIS)
+    fun syncContext(syncUser: SyncUser) = RequestContext(username = syncUser.username, caseloadId = syncUser.activeCaseloadId, source = DataSource.NOMIS)
   }
 }

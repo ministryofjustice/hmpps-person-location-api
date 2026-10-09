@@ -2,7 +2,7 @@ package uk.gov.justice.digital.hmpps.personlocationapi.integration.config
 
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.transaction.support.TransactionTemplate
-import uk.gov.justice.digital.hmpps.personlocationapi.event.DomainEvent
+import uk.gov.justice.digital.hmpps.personlocationapi.event.domain.DomainEvent
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.HmppsDomainEvent
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.HmppsDomainEventRepository
 import java.util.UUID

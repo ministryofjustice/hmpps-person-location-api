@@ -1,7 +1,6 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.integration.config
 
 import org.springframework.data.repository.findByIdOrNull
-import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.newId
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.prisonCode
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.word
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
@@ -47,7 +46,7 @@ class ExternalMovementOperationsImpl(
       destination: Location? = if (movementType == Type.DEPARTURE) null else prison(),
       notes: String? = word(20),
       scheduleReference: ExternalReference? = null,
-      legacyId: String? = "${newId()}_${newId()}",
+      legacyId: String? = null,
       id: UUID = newUuid(),
     ): ExternalMovementProvider = {
       ExternalMovement(

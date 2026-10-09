@@ -4,8 +4,9 @@ import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext
-import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext.Companion.SYSTEM_USERNAME
 import uk.gov.justice.digital.hmpps.personlocationapi.context.set
+import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.InternalEventEmitter
+import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.RefreshPersonMovementIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.exception.ConflictException
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeriesRepository
@@ -20,6 +21,7 @@ import java.util.UUID
 class ExternalMovementSync(
   private val seriesRepository: CustodialSeriesRepository,
   private val movementRepository: ExternalMovementRepository,
+  private val iee: InternalEventEmitter,
 ) {
   fun sync(personIdentifier: String, request: SyncExternalMovementRequest): ReferenceId = with(request) {
     RequestContext(
@@ -40,12 +42,14 @@ class ExternalMovementSync(
       )?.updateFrom(series, movement)
       ?: movementRepository.save(movement.asEntity(series))
 
+    iee.publishInternalEvent(RefreshPersonMovementIntervals(personIdentifier, move.occurredAt))
+
     ReferenceId(move.id)
   }
 
   fun delete(id: UUID) {
     movementRepository.findByIdOrNull(id)?.let { mov ->
-      RequestContext(username = SYSTEM_USERNAME, source = DataSource.NOMIS).set()
+      RequestContext(source = DataSource.NOMIS).set()
       movementRepository.delete(mov)
     }
   }

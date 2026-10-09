@@ -60,7 +60,7 @@ abstract class IntegrationTest {
     entity: Identifiable,
     revisionType: RevisionType,
     affectedEntities: Set<String>,
-    context: RequestContext = RequestContext.get(),
+    context: RequestContext = RequestContext(),
   ) {
     transactionTemplate.execute {
       val auditReader = AuditReaderFactory.get(entityManager)

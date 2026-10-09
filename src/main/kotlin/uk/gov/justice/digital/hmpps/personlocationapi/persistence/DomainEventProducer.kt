@@ -1,6 +1,6 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.persistence
 
-import uk.gov.justice.digital.hmpps.personlocationapi.event.DomainEvent
+import uk.gov.justice.digital.hmpps.personlocationapi.event.domain.DomainEvent
 import java.util.UUID
 
 interface DomainEventProducer : Identifiable {

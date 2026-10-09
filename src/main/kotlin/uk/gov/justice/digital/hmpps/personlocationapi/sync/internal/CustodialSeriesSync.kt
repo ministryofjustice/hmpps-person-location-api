@@ -4,7 +4,6 @@ import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext
-import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext.Companion.SYSTEM_USERNAME
 import uk.gov.justice.digital.hmpps.personlocationapi.context.set
 import uk.gov.justice.digital.hmpps.personlocationapi.exception.ConflictException
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
@@ -35,7 +34,7 @@ class CustodialSeriesSync(
 
   fun delete(id: UUID) {
     seriesRepository.findByIdOrNull(id)?.let { series ->
-      RequestContext(username = SYSTEM_USERNAME, source = DataSource.NOMIS).set()
+      RequestContext(source = DataSource.NOMIS).set()
       if (movementRepository.countBySeriesId(series.id) > 0) {
         throw ConflictException("Custodial series cannot be deleted with movements")
       } else {

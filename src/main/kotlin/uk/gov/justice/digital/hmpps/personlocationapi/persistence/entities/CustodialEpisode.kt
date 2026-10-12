@@ -1,11 +1,13 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities
 
+import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
 import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
+import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import jakarta.persistence.Version
 import jakarta.validation.constraints.Size
@@ -62,12 +64,35 @@ final class CustodialEpisode(
   var concludedAt: LocalDateTime? = concludedAt
     private set
 
+  internal fun episodeCommenced(dateTime: LocalDateTime) = apply {
+    this.commencedAt = dateTime
+  }
+
   internal fun concludeEpisode(dateTime: LocalDateTime, status: Status) = apply {
     this.concludedAt = dateTime
     this.status = status
   }
 
-  fun activeAt(dateTime: LocalDateTime): Boolean = !commencedAt.isAfter(dateTime) && concludedAt?.isAfter(dateTime) != false
+  @OneToMany(cascade = [CascadeType.ALL], mappedBy = "episode")
+  private var stays: MutableList<PrisonStay> = mutableListOf()
+
+  fun resetStays(after: LocalDateTime?) = apply {
+    stays.removeIf { after == null || !it.arrivedAt.isBefore(after) }
+  }
+
+  fun activeAfter(dateTime: LocalDateTime): Boolean = !commencedAt.isAfter(dateTime) && concludedAt?.isAfter(dateTime) != false
+
+  fun applyStay(stay: PrisonStay) = apply {
+    if (stays.isEmpty()) {
+      commencedAt = stay.arrivedAt
+      status = Status.ACTIVE
+      if (stay.status == PrisonStay.Status.RELEASED) {
+        concludedAt = stay.departedAt
+        status = Status.COMPLETED
+      }
+    }
+    stays.add(stay)
+  }
 
   enum class Status { ACTIVE, TEMPORARY_ABSENCE, COMPLETED, UAL, DECEASED, CANCELLED }
 }

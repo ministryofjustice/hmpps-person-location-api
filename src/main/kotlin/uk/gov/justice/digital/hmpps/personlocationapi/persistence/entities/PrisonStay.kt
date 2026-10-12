@@ -83,11 +83,11 @@ final class PrisonStay(
 
   fun movements(): List<ExternalMovement> = Collections.unmodifiableList(movements.sortedBy { it.occurredAt })
 
-  fun activeAfter(dateTime: LocalDateTime) = !arrivedAt.isAfter(dateTime) && departedAt?.isAfter(dateTime) != false
-
-  fun resetMovements() = apply {
-    movements.clear()
+  fun resetMovements(after: LocalDateTime?) = apply {
+    movements.removeIf { after == null || it.occurredAt.isAfter(after) }
   }
+
+  fun activeAfter(dateTime: LocalDateTime) = !arrivedAt.isAfter(dateTime) && departedAt?.isAfter(dateTime) != false
 
   fun applyMovement(movement: ExternalMovement) = apply {
     if (

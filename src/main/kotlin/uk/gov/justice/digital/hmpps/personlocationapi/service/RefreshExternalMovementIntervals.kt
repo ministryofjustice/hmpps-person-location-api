@@ -1,4 +1,4 @@
-package uk.gov.justice.digital.hmpps.personlocationapi
+package uk.gov.justice.digital.hmpps.personlocationapi.service
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -21,11 +21,11 @@ class RefreshExternalMovementIntervals(
   fun execute(event: RefreshPersonMovementIntervals) {
     val ep = episodeRepository.findAllByPersonIdentifier(event.personIdentifier)
       .sortedBy { it.commencedAt }
-      .dropWhile { e -> event.refreshFrom == null && e.concludedAt == null && e.concludedAt!!.isBefore(event.refreshFrom) }
+      .dropWhile { e -> event.refreshFrom != null && e.concludedAt != null && e.concludedAt!!.isBefore(event.refreshFrom) }
       .toCollection(ArrayDeque())
     val st = stayRepository.findAllByPersonIdentifier(event.personIdentifier)
       .sortedBy { it.arrivedAt }
-      .dropWhile { e -> event.refreshFrom == null && e.departedAt == null && e.departedAt!!.isBefore(event.refreshFrom) }
+      .dropWhile { e -> event.refreshFrom != null && e.departedAt != null && e.departedAt!!.isBefore(event.refreshFrom) }
       .toCollection(ArrayDeque())
     val movements = movementRepository.findByPersonIdentifier(event.personIdentifier)
       .filter { event.refreshFrom == null || !it.occurredAt.isBefore(event.refreshFrom) }
@@ -33,18 +33,24 @@ class RefreshExternalMovementIntervals(
 
     val episodes = mutableSetOf<CustodialEpisode>()
     val stays = mutableSetOf<PrisonStay>()
-    var currentStay: PrisonStay? = st.removeFirstOrNull()?.resetMovements()
-    var currentEpisode: CustodialEpisode? = currentStay?.episode?.also { ep.removeIf { it.id == currentStay?.episode?.id } } ?: ep.removeFirstOrNull()
+    var currentStay: PrisonStay? = st.removeFirstOrNull()?.resetMovements(event.refreshFrom)
+    var currentEpisode: CustodialEpisode? =
+      (currentStay?.episode?.also { ep.removeIf { it.id == currentStay?.episode?.id } } ?: ep.removeFirstOrNull())
+        ?.resetStays(event.refreshFrom)
     movements.forEach { movement ->
-      currentStay?.applyMovement(movement)
+      currentStay?.applyMovement(movement)?.also { currentEpisode?.applyStay(it) }
       currentStay = currentStay?.takeIf { it.activeAfter(movement.occurredAt) }?.also { stays.add(it) }
-      currentEpisode = currentEpisode?.takeIf { it.activeAt(movement.occurredAt) }?.also { episodes.add(it) }
+      currentEpisode = currentEpisode?.takeIf { it.activeAfter(movement.occurredAt) }?.also { episodes.add(it) }
       if (movement.movementType == ExternalMovement.Type.ARRIVAL && movement.destination is Prison) {
         if (currentEpisode == null) {
           currentEpisode = movement.newEpisode().also { episodes.add(it) }
         }
         if (currentStay == null) {
-          currentStay = (st.removeFirstOrNull()?.resetMovements() ?: movement.newStay(currentEpisode)).also { stays.add(it) }
+          currentStay = (st.removeFirstOrNull()?.resetMovements(event.refreshFrom) ?: movement.newStay(currentEpisode))
+            .also {
+              stays.add(it)
+              currentEpisode?.applyStay(it)
+            }
         }
       }
     }

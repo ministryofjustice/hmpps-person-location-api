@@ -36,13 +36,21 @@ class ExternalMovementSync(
       throw ConflictException("Person identifier mismatch")
     }
 
-    val move = (
+    val original = (
       movement.dpsId?.let { movementRepository.findByIdOrNull(it) }
         ?: movementRepository.findByLegacyId(requireNotNull(movement.legacyId))
-      )?.updateFrom(series, movement)
+      )
+    val originalOccurredAt = original?.occurredAt
+
+    val move = original?.updateFrom(series, movement)
       ?: movementRepository.save(movement.asEntity(series))
 
-    iee.publishInternalEvent(RefreshPersonMovementIntervals(personIdentifier, move.occurredAt))
+    iee.publishInternalEvent(
+      RefreshPersonMovementIntervals(
+        personIdentifier,
+        listOfNotNull(originalOccurredAt, move.occurredAt).min(),
+      ),
+    )
 
     ReferenceId(move.id)
   }

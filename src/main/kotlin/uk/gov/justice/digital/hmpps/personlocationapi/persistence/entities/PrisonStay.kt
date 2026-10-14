@@ -84,7 +84,14 @@ final class PrisonStay(
   fun movements(): List<ExternalMovement> = Collections.unmodifiableList(movements.sortedBy { it.occurredAt })
 
   fun resetMovements(after: LocalDateTime?) = apply {
-    movements.removeIf { after == null || it.occurredAt.isAfter(after) }
+    movements.removeIf { after == null || !it.occurredAt.isBefore(after) }
+    val latest = movements.maxByOrNull { it.occurredAt }
+    departedAt = latest?.takeIf { it.journeyType == ExternalJourney.Type.RELEASE }?.occurredAt
+    status = when (latest?.journeyType) {
+      ExternalJourney.Type.RELEASE -> Status.RELEASED
+      ExternalJourney.Type.TRANSFER -> Status.IN_TRANSIT_EXTERNAL
+      else -> Status.RESIDENT
+    }
   }
 
   fun activeAfter(dateTime: LocalDateTime) = !arrivedAt.isAfter(dateTime) && departedAt?.isAfter(dateTime) != false

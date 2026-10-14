@@ -78,6 +78,12 @@ final class CustodialEpisode(
 
   fun resetStays(after: LocalDateTime?) = apply {
     stays.removeIf { after == null || !it.arrivedAt.isBefore(after) }
+    stays.maxByOrNull { it.arrivedAt }?.also {
+      if (it.status == PrisonStay.Status.RELEASED) {
+        concludedAt = it.departedAt
+        status = Status.COMPLETED
+      }
+    }
   }
 
   fun activeAfter(dateTime: LocalDateTime): Boolean = !commencedAt.isAfter(dateTime) && concludedAt?.isAfter(dateTime) != false

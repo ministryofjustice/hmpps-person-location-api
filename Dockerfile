@@ -15,7 +15,6 @@ ENV BUILD_NUMBER=${BUILD_NUMBER:-1_0_0}
 
 WORKDIR /app
 COPY --chown=appuser:appgroup applicationinsights.json ./
-COPY --chown=appuser:appgroup applicationinsights.dev.json ./
 COPY --chown=appuser:appgroup applicationinsights-agent*.jar ./agent.jar
 COPY --from=builder --chown=appuser:appgroup /builder/extracted/dependencies/ ./
 COPY --from=builder --chown=appuser:appgroup /builder/extracted/spring-boot-loader/ ./

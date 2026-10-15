@@ -9,7 +9,6 @@ generic-service:
 
 generic-prometheus-alerts:
   businessHoursOnly: true
-  alertSeverity: move-and-improve-alerts-non-prod
   rdsAlertsDatabases:
     cloud-platform-02de43ec94984c2f: "Person Location API DB"
     rdsAlertsConnectionThreshold: 100

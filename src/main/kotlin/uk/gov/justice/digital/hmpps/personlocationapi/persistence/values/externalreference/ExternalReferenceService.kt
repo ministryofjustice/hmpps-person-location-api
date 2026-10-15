@@ -5,6 +5,7 @@ enum class ExternalReferenceService(val code: String, val description: String) {
   TEMPORARY_ABSENCE_SCHEDULER("temporary-absence-scheduler", "Temporary Absence Scheduler"),
   TRANSFER_SCHEDULER("transfer-scheduler", "Transfer Scheduler"),
   RELEASE_SCHEDULER("release-scheduler", "Release Scheduler"),
+  REMAND_AND_SENTENCING("remand-and-sentencing", "Remand and Sentencing"),
   ;
 
   companion object {
@@ -15,7 +16,7 @@ enum class ExternalReferenceService(val code: String, val description: String) {
 }
 
 enum class ExternalReferenceEntity(val code: String, val services: Set<ExternalReferenceService>) {
-  COURT_APPEARANCE("court-appearance", setOf(ExternalReferenceService.COURT_APPEARANCE_SCHEDULER)),
+  COURT_APPEARANCE("court-appearance", setOf(ExternalReferenceService.COURT_APPEARANCE_SCHEDULER, ExternalReferenceService.REMAND_AND_SENTENCING)),
   TEMPORARY_ABSENCE("temporary-absence", setOf(ExternalReferenceService.TEMPORARY_ABSENCE_SCHEDULER)),
   TRANSFER("transfer", setOf(ExternalReferenceService.TRANSFER_SCHEDULER)),
   RELEASE("release", setOf(ExternalReferenceService.RELEASE_SCHEDULER)),

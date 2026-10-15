@@ -1,10 +1,10 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.sync.internal
 
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext
 import uk.gov.justice.digital.hmpps.personlocationapi.context.set
-import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.InternalEventEmitter
 import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.RefreshPersonMovementIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeries
@@ -23,10 +23,10 @@ import java.util.UUID
 @Transactional
 @Service
 class ExternalMovementsResync(
+  private val aep: ApplicationEventPublisher,
   private val seriesRepository: CustodialSeriesRepository,
   private val movementRepository: ExternalMovementRepository,
   private val msa: MigrationSystemAuditRepository,
-  private val iee: InternalEventEmitter,
 ) {
   fun all(personIdentifier: String, request: ResyncExternalMovementsRequest): ResyncResponse {
     RequestContext(source = DataSource.NOMIS, migratingData = true).set()
@@ -49,7 +49,7 @@ class ExternalMovementsResync(
 
     val mappings = request.custodialSeries.map { it.resync(personIdentifier, seriesProvider, movementProvider, maProvider) }
     removeNotInResync(mappings, existingMovements.values, existingSeries.values)
-    iee.publishInternalEvent(RefreshPersonMovementIntervals(personIdentifier))
+    aep.publishEvent(RefreshPersonMovementIntervals(personIdentifier))
     return ResyncResponse(mappings)
   }
 

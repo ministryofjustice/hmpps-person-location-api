@@ -141,20 +141,27 @@ class RefreshIntervalsIntTest(
     with(journeys.first()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
       assertThat(movements().map { it.id }).containsExactly(admission.id)
+      assertThat(origin).isNull()
+      assertThat(destination).isEqualTo(prisonOne.code)
     }
     with(journeys[1]) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TEMPORARY_ABSENCE)
       assertThat(externalReference).isEqualTo(tapDep.scheduleReference!!)
       assertThat(movements().map { it.id }).containsExactly(tapDep.id, tapArr.id)
+      assertThat(origin).isEqualTo(prisonOne.code)
+      assertThat(destination).isEqualTo(prisonOne.code)
     }
     with(journeys[2]) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TRANSFER)
       assertThat(movements().map { it.id }).containsExactly(trDep.id, trArr.id)
+      assertThat(origin).isEqualTo(prisonOne.code)
+      assertThat(destination).isEqualTo(prisonTwo.code)
     }
     with(journeys.last()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.COURT_APPEARANCE)
       assertThat(externalReference).isEqualTo(courtApp.scheduleReference!!)
       assertThat(movements().map { it.id }).containsExactly(courtApp.id, rel.id)
+      assertThat(origin).isEqualTo(prisonTwo.code)
     }
   }
 
@@ -254,20 +261,28 @@ class RefreshIntervalsIntTest(
     with(journeys.first()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
       assertThat(movements().map { it.id }).containsExactly(admissionOne.id)
+      assertThat(origin).isNull()
+      assertThat(destination).isEqualTo(prisonOne.code)
     }
     with(journeys[1]) {
       assertThat(type).isEqualTo(ExternalJourney.Type.RELEASE)
       assertThat(movements().map { it.id }).containsExactly(relOne.id)
+      assertThat(origin).isEqualTo(prisonOne.code)
+      assertThat(destination).isNull()
     }
     with(journeys[2]) {
       assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
       assertThat(movements().map { it.id }).containsExactly(admissionTwo.id)
+      assertThat(origin).isNull()
+      assertThat(destination).isEqualTo(prisonTwo.code)
     }
     with(journeys.last()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TEMPORARY_ABSENCE)
       assertThat(externalReference).isEqualTo(tapDep.scheduleReference!!)
       assertThat(status).isEqualTo(ExternalJourney.Status.IN_TRANSIT)
       assertThat(movements().map { it.id }).containsExactly(tapDep.id)
+      assertThat(origin).isEqualTo(prisonTwo.code)
+      assertThat(destination).isNull()
     }
   }
 
@@ -355,16 +370,22 @@ class RefreshIntervalsIntTest(
     with(journeys.first()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
       assertThat(movements().map { it.id }).containsExactly(admission.id)
+      assertThat(origin).isNull()
+      assertThat(destination).isEqualTo(prisonOne.code)
     }
     with(journeys[1]) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TEMPORARY_ABSENCE)
       assertThat(externalReference).isEqualTo(tapDep.scheduleReference!!)
       assertThat(movements().map { it.id }).containsExactly(tapDep.id, tapArr.id)
+      assertThat(origin).isEqualTo(prisonOne.code)
+      assertThat(destination).isEqualTo(prisonOne.code)
     }
     with(journeys.last()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.RELEASE)
       assertThat(status).isEqualTo(ExternalJourney.Status.COMPLETED)
       assertThat(movements().map { it.id }).containsExactly(rel.id)
+      assertThat(origin).isEqualTo(prisonOne.code)
+      assertThat(destination).isNull()
     }
   }
 
@@ -500,18 +521,26 @@ class RefreshIntervalsIntTest(
     with(journeys.first()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
       assertThat(movements().map { it.id }).containsExactly(admissionOne.id)
+      assertThat(origin).isNull()
+      assertThat(destination).isEqualTo(prisonOne.code)
     }
     with(journeys[1]) {
       assertThat(type).isEqualTo(ExternalJourney.Type.RELEASE)
       assertThat(movements().map { it.id }).containsExactly(relOne.id)
+      assertThat(origin).isEqualTo(prisonOne.code)
+      assertThat(destination).isNull()
     }
     with(journeys[2]) {
       assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
       assertThat(movements().map { it.id }).containsExactly(admissionTwo.id)
+      assertThat(origin).isNull()
+      assertThat(destination).isEqualTo(prisonTwo.code)
     }
     with(journeys.last()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.RELEASE)
       assertThat(movements().map { it.id }).containsExactly(relTwo.id)
+      assertThat(origin).isEqualTo(prisonTwo.code)
+      assertThat(destination).isNull()
     }
   }
 }

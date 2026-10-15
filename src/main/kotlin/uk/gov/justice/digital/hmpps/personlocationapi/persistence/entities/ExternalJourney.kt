@@ -63,7 +63,7 @@ class ExternalJourney(
     joinColumns = [JoinColumn(name = "journey_id", referencedColumnName = "id")],
     inverseJoinColumns = [JoinColumn(name = "movement_id", referencedColumnName = "id")],
   )
-  private var movements: MutableList<ExternalMovement> = mutableListOf()
+  private var movements: MutableSet<ExternalMovement> = linkedSetOf()
 
   fun movements(): List<ExternalMovement> = Collections.unmodifiableList(movements.sortedBy { it.occurredAt })
 
@@ -85,7 +85,9 @@ class ExternalJourney(
   }
 
   private fun updateStatus() {
-    status = if (completingMovement() != null) Status.COMPLETED else Status.IN_TRANSIT
+    val completingMovement = completingMovement()
+    destination = (completingMovement?.destination?.takeIf { it is Prison } as? Prison)?.code
+    status = if (completingMovement != null) Status.COMPLETED else Status.IN_TRANSIT
   }
 
   enum class Type { ADMISSION, COURT_APPEARANCE, TEMPORARY_ABSENCE, TRANSFER, RELEASE }

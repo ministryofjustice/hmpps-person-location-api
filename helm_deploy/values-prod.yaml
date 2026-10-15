@@ -7,7 +7,6 @@ generic-service:
     SENTRY_ENVIRONMENT: prod
 
 generic-prometheus-alerts:
-  alertSeverity: move-and-improve-alerts
   rdsAlertsDatabases:
     cloud-platform-7a12990ca37ce3af: "Person Location API DB"
     rdsAlertsConnectionThreshold: 100

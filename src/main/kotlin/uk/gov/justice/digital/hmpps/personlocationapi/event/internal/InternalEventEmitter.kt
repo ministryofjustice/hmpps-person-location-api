@@ -4,6 +4,8 @@ import org.springframework.retry.RetryPolicy
 import org.springframework.retry.backoff.BackOffPolicy
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
+import org.springframework.transaction.event.TransactionPhase
+import org.springframework.transaction.event.TransactionalEventListener
 import software.amazon.awssdk.services.sqs.model.MessageAttributeValue
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequestEntry
@@ -24,6 +26,7 @@ class InternalEventEmitter(private val jsonMapper: JsonMapper, private val queue
     queueService.findByQueueId("internalevents") ?: throw IllegalStateException("Queue not available")
   }
 
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   fun publishInternalEvent(event: InternalEvent) {
     publishInternalEvents(listOf(event))
   }

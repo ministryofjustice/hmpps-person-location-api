@@ -16,11 +16,11 @@ data class MessageAttributes(
   @JsonAnyGetter @JsonAnySetter
   private val attributes: MutableMap<String, MessageAttribute> = mutableMapOf(),
 ) : MutableMap<String, MessageAttribute> by attributes {
-  constructor(eventType: String, noTracing: Boolean = true) : this(
-    mutableMapOf(
-      "eventType" to MessageAttribute("String", eventType),
-      "noTracing" to MessageAttribute("String", "$noTracing"),
-    ),
+  constructor(eventType: String, noTracing: Boolean = false) : this(
+    buildMap {
+      put("eventType", MessageAttribute("String", eventType))
+      if (noTracing) put("noTracing", MessageAttribute("String", "$noTracing"))
+    }.toMutableMap(),
   )
 
   override operator fun get(key: String): MessageAttribute? = attributes[key]

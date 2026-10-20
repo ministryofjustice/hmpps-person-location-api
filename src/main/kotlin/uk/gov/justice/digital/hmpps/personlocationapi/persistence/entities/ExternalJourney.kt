@@ -85,7 +85,9 @@ class ExternalJourney(
   }
 
   private fun updateStatus() {
-    status = if (completingMovement() != null) Status.COMPLETED else Status.IN_TRANSIT
+    val completingMovement = completingMovement()
+    destination = (completingMovement?.destination?.takeIf { it is Prison } as? Prison)?.code
+    status = if (completingMovement != null) Status.COMPLETED else Status.IN_TRANSIT
   }
 
   enum class Type { ADMISSION, COURT_APPEARANCE, TEMPORARY_ABSENCE, TRANSFER, RELEASE }

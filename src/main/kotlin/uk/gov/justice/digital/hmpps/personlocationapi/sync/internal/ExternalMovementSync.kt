@@ -1,11 +1,11 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.sync.internal
 
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext
 import uk.gov.justice.digital.hmpps.personlocationapi.context.set
-import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.InternalEventEmitter
 import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.RefreshPersonMovementIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.exception.ConflictException
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
@@ -19,9 +19,9 @@ import java.util.UUID
 @Transactional
 @Service
 class ExternalMovementSync(
+  private val aep: ApplicationEventPublisher,
   private val seriesRepository: CustodialSeriesRepository,
   private val movementRepository: ExternalMovementRepository,
-  private val iee: InternalEventEmitter,
 ) {
   fun sync(personIdentifier: String, request: SyncExternalMovementRequest): ReferenceId = with(request) {
     RequestContext(
@@ -45,7 +45,7 @@ class ExternalMovementSync(
     val move = original?.updateFrom(series, movement)
       ?: movementRepository.save(movement.asEntity(series))
 
-    iee.publishInternalEvent(
+    aep.publishEvent(
       RefreshPersonMovementIntervals(
         personIdentifier,
         listOfNotNull(originalOccurredAt, move.occurredAt).min(),

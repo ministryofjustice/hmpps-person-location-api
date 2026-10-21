@@ -48,9 +48,7 @@ class RefreshExternalMovementIntervals(
     val journeys = mutableSetOf<ExternalJourney>()
     var currentJourney: ExternalJourney? = null
     var currentStay: PrisonStay? = st.removeFirstOrNull()?.resetMovements(event.refreshFrom)
-    var currentEpisode: CustodialEpisode? =
-      (currentStay?.episode?.also { ep.removeIf { it.id == currentStay?.episode?.id } } ?: ep.removeFirstOrNull())
-        ?.resetStays(event.refreshFrom)
+    var currentEpisode: CustodialEpisode? = ep.removeFirstOrNull()?.resetStays(event.refreshFrom)
     movements.forEach { movement ->
       if (currentJourney == null) {
         currentJourney = (ejs.removeFirstOrNull()?.resetMovements(movement.occurredAt) ?: movement.newJourney()).also { journeys.add(it) }
@@ -62,7 +60,7 @@ class RefreshExternalMovementIntervals(
       currentEpisode = currentEpisode?.takeIf { it.activeAfter(movement.occurredAt) }?.also { episodes.add(it) }
       if (movement.movementType == ExternalMovement.Type.ARRIVAL && movement.destination is Prison) {
         if (currentEpisode == null) {
-          currentEpisode = movement.newEpisode().also { episodes.add(it) }
+          currentEpisode = ep.removeFirstOrNull() ?: movement.newEpisode().also { episodes.add(it) }
         }
         if (currentStay == null) {
           currentStay = (st.removeFirstOrNull()?.resetMovements(event.refreshFrom) ?: movement.newStay(currentEpisode))

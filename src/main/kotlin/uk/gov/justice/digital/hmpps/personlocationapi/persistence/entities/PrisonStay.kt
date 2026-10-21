@@ -96,6 +96,10 @@ final class PrisonStay(
 
   fun activeAfter(dateTime: LocalDateTime) = !arrivedAt.isAfter(dateTime) && departedAt?.isAfter(dateTime) != false
 
+  internal fun applyEpisode(episode: CustodialEpisode) = apply {
+    this.episode = episode
+  }
+
   fun applyMovement(movement: ExternalMovement) = apply {
     if (
       (movement.origin is Prison && movement.movementType == ExternalMovement.Type.DEPARTURE) ||

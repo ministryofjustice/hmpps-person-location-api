@@ -74,7 +74,9 @@ class ExternalJourney(
 
   fun applyMovement(movement: ExternalMovement) = apply {
     if (status != Status.COMPLETED) {
-      movements.add(movement)
+      if (movements.isEmpty() || movements.first().series.id == movement.series.id) {
+        movements.add(movement)
+      }
       updateStatus()
     }
   }

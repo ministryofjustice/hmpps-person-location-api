@@ -117,7 +117,7 @@ class RefreshIntervalsIntTest(
     assertThat(stays).hasSize(2)
     with(stays.first()) {
       assertThat(arrivedAt).isEqualTo(admission.occurredAt)
-      assertThat(departedAt).isEqualTo(trArr.occurredAt)
+      assertThat(departedAt).isEqualTo(trDep.occurredAt)
       assertThat(status).isEqualTo(PrisonStay.Status.TRANSFERRED_OUT)
       assertThat(movements().map { it.id }).containsExactly(admission.id, tapDep.id, tapArr.id, trDep.id)
     }
@@ -439,7 +439,7 @@ class RefreshIntervalsIntTest(
     )
     val relTwo = givenMovement(
       externalMovement(
-        seriesOne,
+        seriesTwo,
         movementType = ExternalMovement.Type.DEPARTURE,
         journeyType = ExternalJourney.Type.RELEASE,
         origin = prisonTwo,

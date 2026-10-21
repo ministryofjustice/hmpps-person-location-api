@@ -97,7 +97,7 @@ final class CustodialEpisode(
         status = Status.COMPLETED
       }
     }
-    stays.add(stay)
+    stays.add(stay.applyEpisode(this))
   }
 
   enum class Status { ACTIVE, TEMPORARY_ABSENCE, COMPLETED, UAL, DECEASED, CANCELLED }

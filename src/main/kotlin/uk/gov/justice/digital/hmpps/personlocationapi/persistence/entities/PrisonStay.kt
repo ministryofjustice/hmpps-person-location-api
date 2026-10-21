@@ -96,6 +96,10 @@ final class PrisonStay(
 
   fun activeAfter(dateTime: LocalDateTime) = !arrivedAt.isAfter(dateTime) && departedAt?.isAfter(dateTime) != false
 
+  internal fun applyEpisode(episode: CustodialEpisode) = apply {
+    this.episode = episode
+  }
+
   fun applyMovement(movement: ExternalMovement) = apply {
     if (
       (movement.origin is Prison && movement.movementType == ExternalMovement.Type.DEPARTURE) ||
@@ -122,6 +126,11 @@ final class PrisonStay(
           episode.concludeEpisode(movement.occurredAt, CustodialEpisode.Status.COMPLETED)
         }
 
+        ExternalJourney.Type.TRANSFER -> {
+          departedAt = movement.occurredAt
+          status = Status.TRANSFERRED_OUT
+        }
+
         else -> {
           status = Status.IN_TRANSIT_EXTERNAL
         }
@@ -138,9 +147,6 @@ final class PrisonStay(
     }
     if ((movement.destination as Prison).code == prisonCode) {
       movements.add(movement)
-    } else {
-      departedAt = movement.occurredAt
-      status = Status.TRANSFERRED_OUT
     }
   }
 

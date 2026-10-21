@@ -32,54 +32,60 @@ class RefreshExternalMovementIntervals(
       .sortedBy { it.arrivedAt }
       .dropWhile { e -> event.refreshFrom != null && e.departedAt != null && e.departedAt!!.isBefore(event.refreshFrom) }
       .toCollection(ArrayDeque())
-    val movements = movementRepository.findByPersonIdentifier(event.personIdentifier)
+    val movementMap = movementRepository.findByPersonIdentifier(event.personIdentifier)
       .filter { event.refreshFrom == null || !it.occurredAt.isBefore(event.refreshFrom) }
       .sortedBy { it.occurredAt }
-    val ejs = journeyRepository.findFindAllByMovementsIdIn(movements.map { it.id })
+      .groupBy { it.series.id }
+    val ejs = journeyRepository.findFindAllByMovementsIdIn(movementMap.values.flatMap { it.map { m -> m.id } })
       .asSequence()
       .flatMap { j -> j.movements().map { it to j } }
       .sortedBy { it.first.occurredAt }
       .map { it.second }
-      .distinct()
+      .distinctBy { it.id }
       .toCollection(ArrayDeque())
 
     val episodes = mutableSetOf<CustodialEpisode>()
     val stays = mutableSetOf<PrisonStay>()
     val journeys = mutableSetOf<ExternalJourney>()
-    var currentJourney: ExternalJourney? = null
-    var currentStay: PrisonStay? = st.removeFirstOrNull()?.resetMovements(event.refreshFrom)
-    var currentEpisode: CustodialEpisode? =
-      (currentStay?.episode?.also { ep.removeIf { it.id == currentStay?.episode?.id } } ?: ep.removeFirstOrNull())
-        ?.resetStays(event.refreshFrom)
-    movements.forEach { movement ->
-      if (currentJourney == null) {
-        currentJourney = (ejs.removeFirstOrNull()?.resetMovements(movement.occurredAt) ?: movement.newJourney()).also { journeys.add(it) }
-      }
-      currentJourney.applyMovement(movement)
-      currentJourney = currentJourney.takeIf { it.status != ExternalJourney.Status.COMPLETED }
-      currentStay?.applyMovement(movement)?.also { currentEpisode?.applyStay(it) }
-      currentStay = currentStay?.takeIf { it.activeAfter(movement.occurredAt) }?.also { stays.add(it) }
-      currentEpisode = currentEpisode?.takeIf { it.activeAfter(movement.occurredAt) }?.also { episodes.add(it) }
-      if (movement.movementType == ExternalMovement.Type.ARRIVAL && movement.destination is Prison) {
-        if (currentEpisode == null) {
-          currentEpisode = movement.newEpisode().also { episodes.add(it) }
+    movementMap.forEach { (_, movements) ->
+      var currentJourney: ExternalJourney? = ejs.removeFirstOrNull()?.resetMovements(event.refreshFrom)
+      var currentStay: PrisonStay? = st.removeFirstOrNull()?.resetMovements(event.refreshFrom)
+      var currentEpisode: CustodialEpisode? = ep.removeFirstOrNull()?.resetStays(event.refreshFrom)
+      movements.forEach { movement ->
+        currentJourney = currentJourney?.takeIf { it.status != ExternalJourney.Status.COMPLETED }
+        currentStay = currentStay?.takeIf { it.activeAfter(movement.occurredAt) }
+        currentEpisode = currentEpisode?.takeIf { it.activeAfter(movement.occurredAt) }
+
+        if (currentJourney == null) {
+          currentJourney = (ejs.removeFirstOrNull()?.resetMovements(event.refreshFrom) ?: movement.newJourney()).also { journeys.add(it) }
         }
-        if (currentStay == null) {
-          currentStay = (st.removeFirstOrNull()?.resetMovements(event.refreshFrom) ?: movement.newStay(currentEpisode))
-            .also {
-              stays.add(it)
-              currentEpisode?.applyStay(it)
-            }
+
+        if (movement.movementType == ExternalMovement.Type.ARRIVAL && movement.destination is Prison) {
+          if (currentEpisode == null) {
+            currentEpisode = (ep.removeFirstOrNull()?.resetStays(event.refreshFrom) ?: movement.newEpisode())
+              .also { episodes.add(it) }
+          }
+          if (currentStay == null) {
+            currentStay =
+              (st.removeFirstOrNull()?.resetMovements(event.refreshFrom) ?: movement.newStay(currentEpisode))
+                .also {
+                  currentEpisode?.applyStay(it)
+                  stays.add(it)
+                }
+          }
         }
+
+        currentJourney.applyMovement(movement)
+        currentStay?.applyMovement(movement)?.also { currentEpisode?.applyStay(it) }
       }
     }
 
+    stayRepository.deleteAll(st)
+    episodeRepository.deleteAll(ep)
+    journeyRepository.deleteAll(ejs.onEach { ej -> ej.resetMovements(null) } + journeys.filter { it.movements().isEmpty() })
     episodeRepository.saveAll(episodes)
     stayRepository.saveAll(stays)
     journeyRepository.saveAll(journeys)
-    stayRepository.deleteAll(st)
-    episodeRepository.deleteAll(ep)
-    journeyRepository.deleteAll(ejs)
   }
 }
 
@@ -96,7 +102,7 @@ private fun ExternalMovement.newStay(episode: CustodialEpisode) = PrisonStay(
   PrisonStay.Status.RESIDENT,
   occurredAt,
   null,
-).applyMovement(this)
+)
 
 private fun ExternalMovement.newJourney() = ExternalJourney(
   personIdentifier,

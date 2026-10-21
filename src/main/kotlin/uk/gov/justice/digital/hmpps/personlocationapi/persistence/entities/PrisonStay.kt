@@ -79,7 +79,7 @@ final class PrisonStay(
     joinColumns = [JoinColumn(name = "stay_id", referencedColumnName = "id")],
     inverseJoinColumns = [JoinColumn(name = "movement_id", referencedColumnName = "id")],
   )
-  private var movements: MutableList<ExternalMovement> = mutableListOf()
+  private var movements: MutableSet<ExternalMovement> = linkedSetOf()
 
   fun movements(): List<ExternalMovement> = Collections.unmodifiableList(movements.sortedBy { it.occurredAt })
 

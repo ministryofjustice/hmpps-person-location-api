@@ -23,6 +23,7 @@ typealias ExternalMovementProvider = () -> ExternalMovement
 interface ExternalMovementOperations {
   fun findMovement(uuid: UUID): ExternalMovement?
   fun givenMovement(emp: ExternalMovementProvider): ExternalMovement
+  fun removeMovement(uuid: UUID)
 }
 
 class ExternalMovementOperationsImpl(
@@ -30,6 +31,7 @@ class ExternalMovementOperationsImpl(
 ) : ExternalMovementOperations {
   override fun findMovement(uuid: UUID): ExternalMovement? = movementRepository.findByIdOrNull(uuid)
   override fun givenMovement(emp: ExternalMovementProvider): ExternalMovement = movementRepository.save(emp())
+  override fun removeMovement(uuid: UUID) = movementRepository.deleteById(uuid)
 
   companion object {
     fun reason(code: String = word(6), description: String = word(40)) = CodedReason(code, description)

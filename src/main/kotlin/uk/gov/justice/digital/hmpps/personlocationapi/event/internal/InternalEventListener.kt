@@ -8,12 +8,14 @@ import tools.jackson.module.kotlin.readValue
 import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext
 import uk.gov.justice.digital.hmpps.personlocationapi.context.set
 import uk.gov.justice.digital.hmpps.personlocationapi.event.Notification
+import uk.gov.justice.digital.hmpps.personlocationapi.service.RefreshAllIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.service.RefreshExternalMovementIntervals
 
 @Component
 class InternalEventListener(
   private val jsonMapper: JsonMapper,
   private val refresh: RefreshExternalMovementIntervals,
+  private val refreshAll: RefreshAllIntervals,
 ) {
   @SqsListener(
     "internalevents",
@@ -24,8 +26,9 @@ class InternalEventListener(
   fun handleInternalEvent(notification: Notification) {
     try {
       RequestContext().set()
-      when (notification.eventType) {
-        RefreshPersonMovementIntervals.EVENT_TYPE -> refresh.execute(jsonMapper.readValue(notification.message))
+      when (val event: InternalEvent = jsonMapper.readValue(notification.message)) {
+        is RefreshPersonMovementIntervals -> refresh.execute(event)
+        is RefreshAllMovementIntervals -> refreshAll.execute()
       }
     } catch (ex: Exception) {
       Sentry.captureException(ex)

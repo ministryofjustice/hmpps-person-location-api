@@ -73,6 +73,9 @@ class ExternalJourney(
   }
 
   fun applyMovement(movement: ExternalMovement) = apply {
+    if (movements.isEmpty()) {
+      type = movement.journeyType
+    }
     if (status != Status.COMPLETED) {
       if (movements.isEmpty() || movements.first().series.id == movement.series.id) {
         movements.add(movement)

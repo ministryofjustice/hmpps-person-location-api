@@ -126,6 +126,9 @@ interface CustodialSeriesRepository : JpaRepository<CustodialSeries, UUID> {
   fun findByLegacyId(legacyId: Long): CustodialSeries?
 
   fun findByPersonIdentifier(personIdentifier: String): List<CustodialSeries>
+
+  @Query("select distinct cs.personIdentifier from CustodialSeries cs")
+  fun findPersonIdentifiers(): Set<String>
 }
 
 fun CustodialSeriesRepository.getSeries(id: UUID): CustodialSeries = findByIdOrNull(id) ?: throw NotFoundException("Custodial Series not found")

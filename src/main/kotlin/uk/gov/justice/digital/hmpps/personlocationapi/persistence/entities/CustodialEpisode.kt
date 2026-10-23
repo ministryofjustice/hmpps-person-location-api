@@ -1,5 +1,6 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities
 
+import com.sun.org.apache.xalan.internal.lib.ExsltDatetime.dateTime
 import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -17,6 +18,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
 import java.time.LocalDateTime
+import java.util.Collections
 import java.util.UUID
 
 @Entity
@@ -64,8 +66,8 @@ final class CustodialEpisode(
   var concludedAt: LocalDateTime? = concludedAt
     private set
 
-  internal fun episodeCommenced(dateTime: LocalDateTime) = apply {
-    this.commencedAt = dateTime
+  internal fun applySeries(series: CustodialSeries) = apply {
+    this.series = series
   }
 
   internal fun concludeEpisode(dateTime: LocalDateTime, status: Status) = apply {
@@ -75,6 +77,8 @@ final class CustodialEpisode(
 
   @OneToMany(cascade = [CascadeType.ALL], mappedBy = "episode")
   private var stays: MutableList<PrisonStay> = mutableListOf()
+
+  fun stays(): List<PrisonStay> = Collections.unmodifiableList(stays.sortedBy { it.arrivedAt })
 
   fun resetStays(after: LocalDateTime?) = apply {
     stays.removeIf { after == null || !it.arrivedAt.isBefore(after) }

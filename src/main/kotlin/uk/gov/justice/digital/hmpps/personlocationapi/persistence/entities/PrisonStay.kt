@@ -86,10 +86,10 @@ final class PrisonStay(
   fun resetMovements(after: LocalDateTime?) = apply {
     movements.removeIf { after == null || !it.occurredAt.isBefore(after) }
     val latest = movements.maxByOrNull { it.occurredAt }
-    departedAt = latest?.takeIf { it.journeyType == ExternalJourney.Type.RELEASE }?.occurredAt
+    departedAt = latest?.takeIf { it.journeyType in listOf(ExternalJourney.Type.RELEASE, ExternalJourney.Type.TRANSFER) }?.occurredAt
     status = when (latest?.journeyType) {
       ExternalJourney.Type.RELEASE -> Status.RELEASED
-      ExternalJourney.Type.TRANSFER -> Status.IN_TRANSIT_EXTERNAL
+      ExternalJourney.Type.TRANSFER -> Status.TRANSFERRED_OUT
       else -> Status.RESIDENT
     }
   }

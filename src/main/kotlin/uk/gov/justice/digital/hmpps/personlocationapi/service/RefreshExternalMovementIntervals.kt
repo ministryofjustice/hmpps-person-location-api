@@ -62,8 +62,10 @@ class RefreshExternalMovementIntervals(
 
         if (movement.movementType == ExternalMovement.Type.ARRIVAL && movement.destination is Prison) {
           if (currentEpisode == null) {
-            currentEpisode = (ep.removeFirstOrNull()?.resetStays(event.refreshFrom) ?: movement.newEpisode())
-              .also { episodes.add(it) }
+            currentEpisode = (ep.removeFirstOrNull()?.resetStays(event.refreshFrom)?.applySeries(movement.series) ?: movement.newEpisode())
+              .also {
+                episodes.add(it)
+              }
           }
           if (currentStay == null) {
             currentStay =
@@ -80,8 +82,8 @@ class RefreshExternalMovementIntervals(
       }
     }
 
-    stayRepository.deleteAll(st)
-    episodeRepository.deleteAll(ep)
+    stayRepository.deleteAll(st.onEach { st -> st.resetMovements(null) } + stays.filter { it.movements().isEmpty() })
+    episodeRepository.deleteAll(ep.onEach { e -> e.resetStays(null) } + episodes.filter { it.stays().isEmpty() })
     journeyRepository.deleteAll(ejs.onEach { ej -> ej.resetMovements(null) } + journeys.filter { it.movements().isEmpty() })
     episodeRepository.saveAll(episodes)
     stayRepository.saveAll(stays)

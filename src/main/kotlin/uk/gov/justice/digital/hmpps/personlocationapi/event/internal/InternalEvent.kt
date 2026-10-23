@@ -8,6 +8,7 @@ import java.time.LocalDateTime
 @JsonSubTypes(
   value = [
     JsonSubTypes.Type(value = RefreshPersonMovementIntervals::class, name = RefreshPersonMovementIntervals.EVENT_TYPE),
+    JsonSubTypes.Type(value = RefreshAllMovementIntervals::class, name = RefreshAllMovementIntervals.EVENT_TYPE),
   ],
 )
 sealed interface InternalEvent {
@@ -22,4 +23,9 @@ data class RefreshPersonMovementIntervals(val personIdentifier: String, val refr
   companion object {
     const val EVENT_TYPE = "person.external-movement-intervals.refresh"
   }
+}
+
+object RefreshAllMovementIntervals : InternalEvent {
+  const val EVENT_TYPE = "all.external-movement-intervals.refresh"
+  override val type: String = EVENT_TYPE
 }

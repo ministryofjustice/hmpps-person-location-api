@@ -69,19 +69,19 @@ class ExternalJourney(
 
   fun resetMovements(after: LocalDateTime?) = apply {
     movements.removeIf { after == null || !it.occurredAt.isBefore(after) }
-    updateStatus()
   }
 
   fun applyMovement(movement: ExternalMovement) = apply {
     if (movements.isEmpty()) {
       type = movement.journeyType
+      origin = (movement.origin.takeIf { it is Prison } as? Prison)?.code
+      destination = (movement.destination.takeIf { it is Prison } as? Prison)?.code
+      externalReference = movement.scheduleReference
     }
-    if (status != Status.COMPLETED) {
-      if (movements.isEmpty() || movements.first().series.id == movement.series.id) {
-        movements.add(movement)
-      }
-      updateStatus()
+    if (movements().isEmpty() || status != Status.COMPLETED) {
+      movements.add(movement)
     }
+    updateStatus()
   }
 
   internal fun completingMovement() = movements.firstOrNull {

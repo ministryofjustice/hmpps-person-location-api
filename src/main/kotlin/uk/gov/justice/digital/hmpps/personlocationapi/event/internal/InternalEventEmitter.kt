@@ -33,6 +33,7 @@ class InternalEventEmitter(private val jsonMapper: JsonMapper, private val queue
     publishInternalEvents(listOf(event))
   }
 
+  @Async
   fun publishInternalEvents(events: Collection<InternalEvent>) {
     events.asSequence().chunked(10).forEach { queue.publishBatch(it) }
   }

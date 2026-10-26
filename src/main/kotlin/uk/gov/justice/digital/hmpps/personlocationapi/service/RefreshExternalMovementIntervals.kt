@@ -38,7 +38,8 @@ class RefreshExternalMovementIntervals(
       .filter { event.refreshFrom == null || !it.occurredAt.isBefore(event.refreshFrom) }
       .sortedBy { it.occurredAt }
       .groupBy { it.series.id }
-    val ejs = journeyRepository.findFindAllByMovementsIdIn(movementMap.values.flatMap { it.map { m -> m.id } })
+    val movementIds = movementMap.values.flatMap { it.map { m -> m.id } }.toSet()
+    val ejs = journeyRepository.findFindAllByMovementsIdIn(movementIds)
       .asSequence()
       .flatMap { j -> j.movements().map { it to j } }
       .sortedBy { it.first.occurredAt }
@@ -47,11 +48,14 @@ class RefreshExternalMovementIntervals(
       .onEach { j -> j.resetMovements(event.refreshFrom) }
       .toCollection(ArrayDeque())
 
+    journeyRepository.removeMovementLinks(movementIds)
+    stayRepository.removeMovementLinks(movementIds)
+
     val episodes = mutableSetOf<CustodialEpisode>()
     val stays = mutableSetOf<PrisonStay>()
     val journeys = mutableSetOf<ExternalJourney>()
     movementMap.forEach { (_, movements) ->
-      var currentJourney: ExternalJourney? = ejs.removeFirstOrNull()?.also { journeys.add(it) }
+      var currentJourney: ExternalJourney? = null
       var currentStay: PrisonStay? = st.removeFirstOrNull()?.also { stays.add(it) }
       var currentEpisode: CustodialEpisode? = ep.removeFirstOrNull()?.also { episodes.add(it) }
       movements.forEach { movement ->
@@ -78,12 +82,12 @@ class RefreshExternalMovementIntervals(
       }
     }
 
-    episodeRepository.saveAll(episodes)
-    stayRepository.saveAll(stays)
-    journeyRepository.saveAll(journeys)
     stayRepository.deleteAll(st + stays.filter { it.movements().isEmpty() })
     episodeRepository.deleteAll(ep + episodes.filter { it.stays().isEmpty() })
     journeyRepository.deleteAll(ejs + journeys.filter { it.movements().isEmpty() })
+    episodeRepository.saveAll(episodes)
+    stayRepository.saveAll(stays)
+    journeyRepository.saveAll(journeys)
   }
 }
 

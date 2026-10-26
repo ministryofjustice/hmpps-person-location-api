@@ -15,6 +15,8 @@ import jakarta.validation.constraints.Size
 import org.hibernate.annotations.JdbcType
 import org.hibernate.dialect.type.PostgreSQLEnumJdbcType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Prison
@@ -156,4 +158,8 @@ final class PrisonStay(
 
 interface PrisonStayRepository : JpaRepository<PrisonStay, UUID> {
   fun findAllByPersonIdentifier(personIdentifier: String): MutableList<PrisonStay>
+
+  @Modifying
+  @Query("delete from prison_stay_movement where movement_id in (:movementIds)", nativeQuery = true)
+  fun removeMovementLinks(movementIds: Collection<UUID>)
 }

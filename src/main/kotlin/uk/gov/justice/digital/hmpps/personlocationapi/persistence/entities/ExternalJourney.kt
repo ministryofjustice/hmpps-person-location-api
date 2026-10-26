@@ -14,6 +14,8 @@ import jakarta.validation.constraints.Size
 import org.hibernate.annotations.JdbcType
 import org.hibernate.dialect.type.PostgreSQLEnumJdbcType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Prison
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReference
@@ -100,5 +102,9 @@ class ExternalJourney(
 }
 
 interface ExternalJourneyRepository : JpaRepository<ExternalJourney, UUID> {
-  fun findFindAllByMovementsIdIn(movementIds: List<UUID>): List<ExternalJourney>
+  fun findFindAllByMovementsIdIn(movementIds: Collection<UUID>): List<ExternalJourney>
+
+  @Modifying
+  @Query("delete from external_journey_movement where movement_id in (:movementIds)", nativeQuery = true)
+  fun removeMovementLinks(movementIds: Collection<UUID>)
 }

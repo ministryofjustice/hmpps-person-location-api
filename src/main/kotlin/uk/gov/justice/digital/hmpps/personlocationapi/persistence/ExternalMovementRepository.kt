@@ -1,7 +1,10 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.persistence
 
+import jakarta.persistence.QueryHint
+import org.hibernate.jpa.HibernateHints
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.jpa.repository.QueryHints
 import org.springframework.data.repository.findByIdOrNull
 import uk.gov.justice.digital.hmpps.personlocationapi.exception.NotFoundException
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement
@@ -30,6 +33,7 @@ interface ExternalMovementRepository : JpaRepository<ExternalMovement, UUID> {
 
   fun findByLegacyId(legacyId: String): ExternalMovement?
 
+  @QueryHints(QueryHint(name = HibernateHints.HINT_READ_ONLY, value = "true"))
   fun findByPersonIdentifier(personIdentifier: String): List<ExternalMovement>
 }
 

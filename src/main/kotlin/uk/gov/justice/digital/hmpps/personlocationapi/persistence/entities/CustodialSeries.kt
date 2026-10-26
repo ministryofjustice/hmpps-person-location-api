@@ -3,14 +3,17 @@ package uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
+import jakarta.persistence.QueryHint
 import jakarta.persistence.Table
 import jakarta.persistence.Version
 import jakarta.validation.constraints.Size
 import org.hibernate.annotations.JdbcType
 import org.hibernate.dialect.type.PostgreSQLEnumJdbcType
 import org.hibernate.envers.Audited
+import org.hibernate.jpa.HibernateHints
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.jpa.repository.QueryHints
 import org.springframework.data.repository.findByIdOrNull
 import uk.gov.justice.digital.hmpps.personlocationapi.exception.NotFoundException
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
@@ -125,8 +128,10 @@ interface CustodialSeriesRepository : JpaRepository<CustodialSeries, UUID> {
 
   fun findByLegacyId(legacyId: Long): CustodialSeries?
 
+  @QueryHints(QueryHint(name = HibernateHints.HINT_READ_ONLY, value = "true"))
   fun findByPersonIdentifier(personIdentifier: String): List<CustodialSeries>
 
+  @QueryHints(QueryHint(name = HibernateHints.HINT_READ_ONLY, value = "true"))
   @Query("select distinct cs.personIdentifier from CustodialSeries cs")
   fun findPersonIdentifiers(): Set<String>
 }

@@ -1,6 +1,5 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities
 
-import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
@@ -75,7 +74,7 @@ final class PrisonStay(
   var departedAt: LocalDateTime? = departedAt
     private set
 
-  @OneToMany(cascade = [CascadeType.ALL])
+  @OneToMany
   @JoinTable(
     name = "prison_stay_movement",
     joinColumns = [JoinColumn(name = "stay_id", referencedColumnName = "id")],

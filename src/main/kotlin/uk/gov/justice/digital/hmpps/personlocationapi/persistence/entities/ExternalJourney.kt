@@ -1,6 +1,5 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities
 
-import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Convert
 import jakarta.persistence.Entity
@@ -59,7 +58,7 @@ class ExternalJourney(
   @Column(name = "version", nullable = false)
   var version: Int? = null
 
-  @OneToMany(cascade = [CascadeType.ALL])
+  @OneToMany
   @JoinTable(
     name = "external_journey_movement",
     joinColumns = [JoinColumn(name = "journey_id", referencedColumnName = "id")],

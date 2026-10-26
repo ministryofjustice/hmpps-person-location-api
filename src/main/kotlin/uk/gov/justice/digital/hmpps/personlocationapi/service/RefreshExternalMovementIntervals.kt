@@ -78,13 +78,12 @@ class RefreshExternalMovementIntervals(
       }
     }
 
-    stayRepository.deleteAll(st + stays.filter { it.movements().isEmpty() })
-    episodeRepository.deleteAll(ep + episodes.filter { it.stays().isEmpty() })
-    journeyRepository.deleteAll(ejs + journeys.filter { it.movements().isEmpty() })
-    journeyRepository.flush()
     episodeRepository.saveAll(episodes)
     stayRepository.saveAll(stays)
     journeyRepository.saveAll(journeys)
+    stayRepository.deleteAll(st + stays.filter { it.movements().isEmpty() })
+    episodeRepository.deleteAll(ep + episodes.filter { it.stays().isEmpty() })
+    journeyRepository.deleteAll(ejs + journeys.filter { it.movements().isEmpty() })
   }
 }
 

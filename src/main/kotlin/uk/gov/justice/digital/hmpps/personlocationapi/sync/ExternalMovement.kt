@@ -15,9 +15,12 @@ data class ExternalMovement(
   val legacyBookingId: Long?,
   val legacySequenceNumber: Int?,
   val type: MovementType,
+  @field:Schema(oneOf = [MovementReason::class])
   val reason: MovementReason,
   val occurredAt: LocalDateTime,
+  @field:Schema(oneOf = [Location::class])
   val from: Location,
+  @field:Schema(oneOf = [Location::class], nullable = true)
   val to: Location?,
   val notes: String?,
   val journey: ExternalJourney,

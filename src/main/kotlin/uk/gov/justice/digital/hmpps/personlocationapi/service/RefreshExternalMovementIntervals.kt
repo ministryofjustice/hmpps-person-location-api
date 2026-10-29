@@ -60,7 +60,9 @@ class RefreshExternalMovementIntervals(
       var currentEpisode: CustodialEpisode? = ep.removeFirstOrNull()?.also { episodes.add(it) }
       movements.forEach { movement ->
         currentJourney = currentJourney?.takeIf { it.status != ExternalJourney.Status.COMPLETED }
-        currentStay = currentStay?.takeIf { it.activeAfter(movement.occurredAt) }
+        currentStay = currentStay?.takeIf {
+          it.activeAfter(movement.occurredAt) || it.relatedTo(movement)
+        }
         currentEpisode = currentEpisode?.takeIf { it.activeAfter(movement.occurredAt) }
 
         if (currentJourney == null) {

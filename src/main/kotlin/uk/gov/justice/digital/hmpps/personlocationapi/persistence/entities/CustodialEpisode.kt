@@ -93,7 +93,11 @@ final class CustodialEpisode(
   fun applyStay(stay: PrisonStay) = apply {
     if (stays.isEmpty()) {
       commencedAt = stay.arrivedAt
-      status = Status.ACTIVE
+      status = when (stay.status) {
+        PrisonStay.Status.RESIDENT, PrisonStay.Status.TRANSFERRED_OUT -> Status.ACTIVE
+        PrisonStay.Status.IN_TRANSIT_EXTERNAL -> Status.TEMPORARY_ABSENCE
+        PrisonStay.Status.RELEASED -> Status.COMPLETED
+      }
       if (stay.status == PrisonStay.Status.RELEASED) {
         concludedAt = stay.departedAt
         status = Status.COMPLETED

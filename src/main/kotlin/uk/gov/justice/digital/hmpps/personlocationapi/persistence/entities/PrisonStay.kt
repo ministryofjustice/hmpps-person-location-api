@@ -97,6 +97,15 @@ final class PrisonStay(
 
   fun activeAfter(dateTime: LocalDateTime) = !arrivedAt.isAfter(dateTime) && departedAt?.isAfter(dateTime) != false
 
+  fun relatedTo(movement: ExternalMovement): Boolean {
+    val newStayRequired = movement.journeyType == ExternalJourney.Type.ADMISSION &&
+      movement.destination is Prison &&
+      (movement.destination as Prison).code != prisonCode
+    departedAt = departedAt ?: movement.occurredAt
+    status = if (status == Status.RELEASED) status else Status.TRANSFERRED_OUT
+    return !newStayRequired
+  }
+
   internal fun applyEpisode(episode: CustodialEpisode) = apply {
     this.episode = episode
   }

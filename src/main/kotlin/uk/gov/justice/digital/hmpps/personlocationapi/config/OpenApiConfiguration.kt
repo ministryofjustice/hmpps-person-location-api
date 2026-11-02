@@ -8,10 +8,13 @@ import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.security.SecurityRequirement
 import io.swagger.v3.oas.models.security.SecurityScheme
 import io.swagger.v3.oas.models.servers.Server
+import io.swagger.v3.oas.models.tags.Tag
 import org.springframework.boot.info.BuildProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import uk.gov.justice.digital.hmpps.personlocationapi.access.Roles
+import uk.gov.justice.digital.hmpps.personlocationapi.config.OpenApiTags.INTEGRATIONS
+import uk.gov.justice.digital.hmpps.personlocationapi.config.OpenApiTags.SYNC
 import java.time.LocalTime
 
 object OpenApiTags {
@@ -34,7 +37,10 @@ class OpenApiConfiguration(buildProperties: BuildProperties) {
       ),
     )
     .tags(
-      listOf(),
+      listOf(
+        Tag().name(INTEGRATIONS).description("DPS integration endpoints"),
+        Tag().name(SYNC).description("Legacy sync endpoints - not to be use by any other client"),
+      ),
     )
     .info(
       Info().title("HMPPS Person Location Api").version(version)

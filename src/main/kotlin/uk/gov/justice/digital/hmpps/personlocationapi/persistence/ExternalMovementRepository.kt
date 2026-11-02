@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.QueryHints
 import org.springframework.data.repository.findByIdOrNull
 import uk.gov.justice.digital.hmpps.personlocationapi.exception.NotFoundException
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement
+import java.time.LocalDateTime
 import java.util.UUID
 
 interface ExternalMovementRepository : JpaRepository<ExternalMovement, UUID> {
@@ -35,6 +36,17 @@ interface ExternalMovementRepository : JpaRepository<ExternalMovement, UUID> {
 
   @QueryHints(QueryHint(name = HibernateHints.HINT_READ_ONLY, value = "true"))
   fun findByPersonIdentifier(personIdentifier: String): List<ExternalMovement>
+
+  @Query(
+    """
+      select em.occurredAt from ExternalMovement em
+      where em.personIdentifier = :personIdentifier
+      and em.occurredAt < :dateTime
+      order by em.occurredAt desc
+      limit 1
+    """,
+  )
+  fun findPreviousOccurredAt(personIdentifier: String, dateTime: LocalDateTime): LocalDateTime?
 }
 
 fun ExternalMovementRepository.getMovement(id: UUID): ExternalMovement = findByIdOrNull(id) ?: throw NotFoundException("External Movement not found")

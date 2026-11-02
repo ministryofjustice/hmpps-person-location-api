@@ -147,21 +147,15 @@ class RefreshIntervalsIntTest(
       )
         .sortedBy { it.movements().first().occurredAt }
     }
-    assertThat(journeys).hasSize(4)
+    assertThat(journeys).hasSize(3)
     with(journeys.first()) {
-      assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
-      assertThat(movements().map { it.id }).containsExactly(admission.id)
-      assertThat(origin).isNull()
-      assertThat(destination).isEqualTo(prisonOne.code)
-    }
-    with(journeys[1]) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TEMPORARY_ABSENCE)
       assertThat(externalReference).isEqualTo(tapDep.scheduleReference!!)
       assertThat(movements().map { it.id }).containsExactly(tapDep.id, tapArr.id)
       assertThat(origin).isEqualTo(prisonOne.code)
       assertThat(destination).isEqualTo(prisonOne.code)
     }
-    with(journeys[2]) {
+    with(journeys[1]) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TRANSFER)
       assertThat(movements().map { it.id }).containsExactly(trDep.id, trArr.id)
       assertThat(origin).isEqualTo(prisonOne.code)
@@ -265,28 +259,11 @@ class RefreshIntervalsIntTest(
 
     val journeys = transactionTemplate.execute {
       journeyRepository.findFindAllByMovementsIdIn(listOf(admissionOne.id, relOne.id, admissionTwo.id, tapDep.id))
-        .sortedBy { it.movements().first().occurredAt }
+        .onEach { it.movements() }
+        .sortedBy { it.commencedAt }
     }
-    assertThat(journeys).hasSize(4)
-    with(journeys.first()) {
-      assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
-      assertThat(movements().map { it.id }).containsExactly(admissionOne.id)
-      assertThat(origin).isNull()
-      assertThat(destination).isEqualTo(prisonOne.code)
-    }
-    with(journeys[1]) {
-      assertThat(type).isEqualTo(ExternalJourney.Type.RELEASE)
-      assertThat(movements().map { it.id }).containsExactly(relOne.id)
-      assertThat(origin).isEqualTo(prisonOne.code)
-      assertThat(destination).isNull()
-    }
-    with(journeys[2]) {
-      assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
-      assertThat(movements().map { it.id }).containsExactly(admissionTwo.id)
-      assertThat(origin).isNull()
-      assertThat(destination).isEqualTo(prisonTwo.code)
-    }
-    with(journeys.last()) {
+    assertThat(journeys).hasSize(1)
+    with(journeys.single()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TEMPORARY_ABSENCE)
       assertThat(externalReference).isEqualTo(tapDep.scheduleReference!!)
       assertThat(status).isEqualTo(ExternalJourney.Status.IN_TRANSIT)
@@ -374,28 +351,16 @@ class RefreshIntervalsIntTest(
 
     val journeys = transactionTemplate.execute {
       journeyRepository.findFindAllByMovementsIdIn(listOf(admission.id, tapDep.id, tapArr.id, rel.id))
-        .sortedBy { it.movements().first().occurredAt }
+        .onEach { it.movements() }
+        .sortedBy { it.commencedAt }
     }
-    assertThat(journeys).hasSize(3)
-    with(journeys.first()) {
-      assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
-      assertThat(movements().map { it.id }).containsExactly(admission.id)
-      assertThat(origin).isNull()
-      assertThat(destination).isEqualTo(prisonOne.code)
-    }
-    with(journeys[1]) {
+    assertThat(journeys).hasSize(1)
+    with(journeys.single()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TEMPORARY_ABSENCE)
       assertThat(externalReference).isEqualTo(tapDep.scheduleReference!!)
       assertThat(movements().map { it.id }).containsExactly(tapDep.id, tapArr.id)
       assertThat(origin).isEqualTo(prisonOne.code)
       assertThat(destination).isEqualTo(prisonOne.code)
-    }
-    with(journeys.last()) {
-      assertThat(type).isEqualTo(ExternalJourney.Type.RELEASE)
-      assertThat(status).isEqualTo(ExternalJourney.Status.COMPLETED)
-      assertThat(movements().map { it.id }).containsExactly(rel.id)
-      assertThat(origin).isEqualTo(prisonOne.code)
-      assertThat(destination).isNull()
     }
   }
 
@@ -525,33 +490,10 @@ class RefreshIntervalsIntTest(
 
     val journeys = transactionTemplate.execute {
       journeyRepository.findFindAllByMovementsIdIn(listOf(admissionOne.id, relOne.id, admissionTwo.id, relTwo.id))
-        .sortedBy { it.movements().first().occurredAt }
+        .onEach { it.movements() }
+        .sortedBy { it.commencedAt }
     }
-    assertThat(journeys).hasSize(4)
-    with(journeys.first()) {
-      assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
-      assertThat(movements().map { it.id }).containsExactly(admissionOne.id)
-      assertThat(origin).isNull()
-      assertThat(destination).isEqualTo(prisonOne.code)
-    }
-    with(journeys[1]) {
-      assertThat(type).isEqualTo(ExternalJourney.Type.RELEASE)
-      assertThat(movements().map { it.id }).containsExactly(relOne.id)
-      assertThat(origin).isEqualTo(prisonOne.code)
-      assertThat(destination).isNull()
-    }
-    with(journeys[2]) {
-      assertThat(type).isEqualTo(ExternalJourney.Type.ADMISSION)
-      assertThat(movements().map { it.id }).containsExactly(admissionTwo.id)
-      assertThat(origin).isNull()
-      assertThat(destination).isEqualTo(prisonTwo.code)
-    }
-    with(journeys.last()) {
-      assertThat(type).isEqualTo(ExternalJourney.Type.RELEASE)
-      assertThat(movements().map { it.id }).containsExactly(relTwo.id)
-      assertThat(origin).isEqualTo(prisonTwo.code)
-      assertThat(destination).isNull()
-    }
+    assertThat(journeys).isEmpty()
   }
 
   @Test
@@ -601,10 +543,11 @@ class RefreshIntervalsIntTest(
 
     val journeys = transactionTemplate.execute {
       journeyRepository.findFindAllByMovementsIdIn(listOf(admission.id, trDep.id))
-        .sortedBy { it.movements().first().occurredAt }
+        .onEach { it.movements() }
+        .sortedBy { it.commencedAt }
     }
-    assertThat(journeys).hasSize(2)
-    with(journeys.last()) {
+    assertThat(journeys).hasSize(1)
+    with(journeys.single()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TRANSFER)
       assertThat(status).isEqualTo(ExternalJourney.Status.IN_TRANSIT)
       assertThat(origin).isEqualTo(prisonOne.code)
@@ -677,12 +620,8 @@ class RefreshIntervalsIntTest(
       journeyRepository.findFindAllByMovementsIdIn(listOf(admission.id, tapDep.id, tapArr.id, rel.id))
         .sortedBy { it.movements().first().occurredAt }
     }
-    assertThat(journeys).hasSize(3)
-    assertThat(journeys.map { it.type }).containsExactly(
-      ExternalJourney.Type.ADMISSION,
-      ExternalJourney.Type.TEMPORARY_ABSENCE,
-      ExternalJourney.Type.RELEASE,
-    )
+    assertThat(journeys).hasSize(1)
+    assertThat(journeys.map { it.type }).containsExactly(ExternalJourney.Type.TEMPORARY_ABSENCE)
   }
 
   @Test

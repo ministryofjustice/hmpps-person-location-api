@@ -2,10 +2,7 @@ package uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.FetchType
 import jakarta.persistence.Id
-import jakarta.persistence.JoinColumn
-import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import jakarta.persistence.Version
@@ -22,7 +19,7 @@ import java.util.UUID
 @Entity
 @Table(name = "custodial_episode")
 final class CustodialEpisode(
-  series: CustodialSeries,
+  personIdentifier: String,
   status: Status,
   commencedAt: LocalDateTime,
   concludedAt: LocalDateTime?,
@@ -38,17 +35,9 @@ final class CustodialEpisode(
   override var version: Int? = null
     private set
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "series_id", nullable = false)
-  var series: CustodialSeries = series
-    private set(value) {
-      field = value
-      personIdentifier = value.personIdentifier
-    }
-
   @Size(max = 7)
   @Column(name = "person_identifier", nullable = false, length = 7)
-  var personIdentifier: String = series.personIdentifier
+  var personIdentifier: String = personIdentifier
     private set
 
   @JdbcType(PostgreSQLEnumJdbcType::class)
@@ -63,10 +52,6 @@ final class CustodialEpisode(
   @Column(name = "concluded_at")
   var concludedAt: LocalDateTime? = concludedAt
     private set
-
-  internal fun applySeries(series: CustodialSeries) = apply {
-    this.series = series
-  }
 
   internal fun concludeEpisode(dateTime: LocalDateTime, status: Status) = apply {
     this.concludedAt = dateTime

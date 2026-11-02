@@ -11,10 +11,12 @@ import io.swagger.v3.oas.models.servers.Server
 import org.springframework.boot.info.BuildProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import uk.gov.justice.digital.hmpps.personlocationapi.access.Roles
 import java.time.LocalTime
 
 object OpenApiTags {
   const val SYNC = "Sync"
+  const val INTEGRATIONS = "Integrations"
 }
 
 @Configuration
@@ -41,11 +43,11 @@ class OpenApiConfiguration(buildProperties: BuildProperties) {
     .components(
       Components()
         .addSecuritySchemes(
-          "PERSON_LOCATION_RO",
-          SecurityScheme().addBearerJwtRequirement("ROLE_PERSON_LOCATION__RO"),
+          Roles.PERSON_PERIODS_RO,
+          SecurityScheme().addBearerJwtRequirement(Roles.PERSON_PERIODS_RO),
         ),
     )
-    .addSecurityItem(SecurityRequirement().addList("PERSON_LOCATION_RO", listOf("read")))
+    .addSecurityItem(SecurityRequirement().addList(Roles.PERSON_LOCATION_RO, listOf("read")))
     .also { PrimitiveType.customClasses()[LocalTime::class.java.name] = PrimitiveType.PARTIAL_TIME }
 }
 

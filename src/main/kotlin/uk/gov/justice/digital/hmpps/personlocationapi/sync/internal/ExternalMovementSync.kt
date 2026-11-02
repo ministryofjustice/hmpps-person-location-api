@@ -57,8 +57,10 @@ class ExternalMovementSync(
 
   fun delete(id: UUID) {
     movementRepository.findByIdOrNull(id)?.let { mov ->
+      val prev = movementRepository.findPreviousOccurredAt(mov.personIdentifier, mov.occurredAt)
       RequestContext(source = DataSource.NOMIS).set()
       movementRepository.delete(mov)
+      aep.publishEvent(RefreshPersonMovementIntervals(mov.personIdentifier, prev))
     }
   }
 }

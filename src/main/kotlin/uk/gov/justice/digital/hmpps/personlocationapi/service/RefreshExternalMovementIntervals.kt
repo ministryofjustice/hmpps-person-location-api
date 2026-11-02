@@ -34,11 +34,10 @@ class RefreshExternalMovementIntervals(
       .dropWhile { e -> event.refreshFrom != null && e.departedAt != null && e.departedAt!!.isBefore(event.refreshFrom) }
       .onEach { s -> s.resetMovements(event.refreshFrom) }
       .toCollection(ArrayDeque())
-    val movementMap = movementRepository.findByPersonIdentifier(event.personIdentifier)
+    val movements = movementRepository.findByPersonIdentifier(event.personIdentifier)
       .filter { event.refreshFrom == null || !it.occurredAt.isBefore(event.refreshFrom) }
       .sortedBy { it.occurredAt }
-      .groupBy { it.series.id }
-    val movementIds = movementMap.values.flatMap { it.map { m -> m.id } }.toSet()
+    val movementIds = movements.map { m -> m.id }.toSet()
     val ejs = journeyRepository.findFindAllByMovementsIdIn(movementIds)
       .asSequence()
       .flatMap { j -> j.movements().map { it to j } }
@@ -54,34 +53,33 @@ class RefreshExternalMovementIntervals(
     val episodes = mutableSetOf<CustodialEpisode>()
     val stays = mutableSetOf<PrisonStay>()
     val journeys = mutableSetOf<ExternalJourney>()
-    movementMap.forEach { (_, movements) ->
-      var currentJourney: ExternalJourney? = null
-      var currentStay: PrisonStay? = st.removeFirstOrNull()?.also { stays.add(it) }
-      var currentEpisode: CustodialEpisode? = ep.removeFirstOrNull()?.also { episodes.add(it) }
-      movements.forEach { movement ->
-        currentJourney = currentJourney?.takeIf { it.status != ExternalJourney.Status.COMPLETED }
-        currentStay = currentStay?.takeIf {
-          it.activeAfter(movement.occurredAt) || it.relatedTo(movement)
-        }
-        currentEpisode = currentEpisode?.takeIf { it.activeAfter(movement.occurredAt) }
+    var currentJourney: ExternalJourney? = null
+    var currentStay: PrisonStay? = st.removeFirstOrNull()?.also { stays.add(it) }
+    var currentEpisode: CustodialEpisode? = ep.removeFirstOrNull()?.also { episodes.add(it) }
+    movements.forEach { movement ->
+      currentJourney = currentJourney?.takeIf { it.activeAfter(movement.occurredAt) }
+      currentStay = currentStay?.takeIf {
+        it.activeAfter(movement.occurredAt) || it.relatedTo(movement)
+      }
+      currentEpisode = currentEpisode?.takeIf { it.activeAfter(movement.occurredAt) }
 
+      if (movement.movementType == ExternalMovement.Type.DEPARTURE && movement.origin is Prison && movement.journeyType != ExternalJourney.Type.RELEASE) {
         if (currentJourney == null) {
           currentJourney = (ejs.removeFirstOrNull() ?: movement.newJourney()).also { journeys.add(it) }
         }
-
-        if (movement.movementType == ExternalMovement.Type.ARRIVAL && movement.destination is Prison) {
-          if (currentEpisode == null) {
-            currentEpisode = (ep.removeFirstOrNull()?.applySeries(movement.series) ?: movement.newEpisode()).also { episodes.add(it) }
-          }
-          if (currentStay == null) {
-            currentStay = (st.removeFirstOrNull() ?: movement.newStay(currentEpisode)).also { stays.add(it) }
-          }
-        }
-
-        currentJourney.applyMovement(movement)
-        currentStay?.applyMovement(movement)?.also { currentEpisode?.applyStay(it) }
-        currentJourney = currentJourney.takeIf { it.status != ExternalJourney.Status.COMPLETED }
       }
+
+      if (movement.movementType == ExternalMovement.Type.ARRIVAL && movement.destination is Prison) {
+        if (currentEpisode == null) {
+          currentEpisode = (ep.removeFirstOrNull() ?: movement.newEpisode()).also { episodes.add(it) }
+        }
+        if (currentStay == null) {
+          currentStay = (st.removeFirstOrNull() ?: movement.newStay(currentEpisode)).also { stays.add(it) }
+        }
+      }
+
+      currentJourney?.applyMovement(movement)
+      currentStay?.applyMovement(movement)?.also { currentEpisode?.applyStay(it) }
     }
 
     val (std, stk) = stays.partition { it.movements().isEmpty() }
@@ -98,7 +96,7 @@ class RefreshExternalMovementIntervals(
 }
 
 private fun ExternalMovement.newEpisode() = CustodialEpisode(
-  series,
+  personIdentifier,
   CustodialEpisode.Status.ACTIVE,
   occurredAt,
   null,
@@ -116,7 +114,9 @@ private fun ExternalMovement.newJourney() = ExternalJourney(
   personIdentifier,
   journeyType,
   ExternalJourney.Status.IN_TRANSIT,
-  if (origin is Prison) (origin as Prison).code else null,
-  if (destination is Prison) (destination as Prison).code else null,
+  occurredAt,
+  null,
+  (origin as Prison).code,
+  null,
   scheduleReference,
 )

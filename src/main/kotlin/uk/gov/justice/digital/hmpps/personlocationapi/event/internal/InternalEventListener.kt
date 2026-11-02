@@ -17,12 +17,7 @@ class InternalEventListener(
   private val refresh: RefreshExternalMovementIntervals,
   private val refreshAll: RefreshAllIntervals,
 ) {
-  @SqsListener(
-    "internalevents",
-    factory = "hmppsQueueContainerFactoryProxy",
-    maxConcurrentMessages = "20",
-    maxMessagesPerPoll = "10",
-  )
+  @SqsListener("internalevents", factory = "hmppsQueueContainerFactoryProxy")
   fun handleInternalEvent(notification: Notification) {
     try {
       RequestContext().set()

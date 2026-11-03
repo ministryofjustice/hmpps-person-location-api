@@ -71,7 +71,8 @@ class RefreshExternalMovementIntervals(
         if (currentEpisode == null) {
           currentEpisode = (ep.removeFirstOrNull() ?: movement.newEpisode()).also { episodes.add(it) }
         }
-        if (currentStay == null) {
+        if (currentStay == null || currentStay.prisonCode != (movement.destination as Prison).code) {
+          currentStay?.transferOut(movement.occurredAt)
           currentStay = (st.removeFirstOrNull() ?: movement.newStay(currentEpisode)).also { stays.add(it) }
         }
       }

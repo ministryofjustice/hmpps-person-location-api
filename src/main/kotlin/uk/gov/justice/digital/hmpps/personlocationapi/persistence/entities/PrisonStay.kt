@@ -124,7 +124,7 @@ final class PrisonStay(
         ExternalJourney.Type.RELEASE -> {
           departedAt = movement.occurredAt
           status = Status.RELEASED
-          episode.concludeEpisode(movement.occurredAt, CustodialEpisode.Status.COMPLETED)
+          episode.updateStatusFrom(this)
         }
 
         ExternalJourney.Type.TRANSFER -> {

@@ -12,6 +12,7 @@ import org.hibernate.dialect.type.PostgreSQLEnumJdbcType
 import org.springframework.data.jpa.repository.JpaRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
 import java.time.LocalDateTime
 import java.util.Collections
 import java.util.UUID
@@ -53,9 +54,16 @@ final class CustodialEpisode(
   var concludedAt: LocalDateTime? = concludedAt
     private set
 
-  internal fun concludeEpisode(dateTime: LocalDateTime, status: Status) = apply {
-    this.concludedAt = dateTime
-    this.status = status
+  internal fun updateStatusFrom(stay: PrisonStay) = apply {
+    val reason = stay.movements().last { it.journeyType == ExternalJourney.Type.RELEASE }.reason as CodedReason
+    status = when {
+      reason.isAbscondedOrEscaped() -> Status.UAL
+      reason.isDeceased() -> Status.DECEASED
+      else -> Status.COMPLETED
+    }
+    if (status == Status.COMPLETED || status == Status.DECEASED) {
+      concludedAt = stay.departedAt
+    }
   }
 
   @OneToMany(mappedBy = "episode")
@@ -84,8 +92,7 @@ final class CustodialEpisode(
         PrisonStay.Status.RELEASED -> Status.COMPLETED
       }
       if (stay.status == PrisonStay.Status.RELEASED) {
-        concludedAt = stay.departedAt
-        status = Status.COMPLETED
+        updateStatusFrom(stay)
       }
     }
     stays.add(stay.applyEpisode(this))

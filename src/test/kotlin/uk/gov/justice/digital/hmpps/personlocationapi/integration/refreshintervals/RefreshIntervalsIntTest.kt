@@ -20,6 +20,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.Exter
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStay
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStayRepository
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReferenceEntity
 import uk.gov.justice.digital.hmpps.personlocationapi.service.RefreshExternalMovementIntervals
 import java.time.LocalDate
@@ -774,5 +775,93 @@ class RefreshIntervalsIntTest(
     assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
     assertThat(episode.concludedAt).isNull()
     assertThat(episode.status).isEqualTo(CustodialEpisode.Status.ACTIVE)
+  }
+
+  @Test
+  fun `UAL ends stay but not episode - status updated`() {
+    val personIdentifier = personIdentifier()
+    val start = LocalDate.now().atTime(9, 30).minusDays(1)
+    val series = givenSeries(custodialSeries(personIdentifier, openedAt = start))
+    val prisonOne = prison()
+    val admission = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = start,
+      ),
+    )
+    val ual = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        reason = CodedReason("UAL", "Unlawfully at large"),
+        origin = prisonOne,
+        destination = null,
+        occurredAt = start.plusHours(4),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stays = transactionTemplate.execute {
+      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }
+    }
+    assertThat(stays).hasSize(1)
+    with(stays.single()) {
+      assertThat(arrivedAt).isEqualTo(admission.occurredAt)
+      assertThat(departedAt).isEqualTo(ual.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+    val episode = stays.single().episode
+    assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
+    assertThat(episode.concludedAt).isNull()
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.UAL)
+  }
+
+  @Test
+  fun `Death in custody recorded correctly`() {
+    val personIdentifier = personIdentifier()
+    val start = LocalDate.now().atTime(9, 30).minusDays(1)
+    val series = givenSeries(custodialSeries(personIdentifier, openedAt = start))
+    val prisonOne = prison()
+    val admission = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = start,
+      ),
+    )
+    val death = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        reason = CodedReason("DEC", "Death in custody"),
+        origin = prisonOne,
+        destination = null,
+        occurredAt = start.plusHours(4),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stays = transactionTemplate.execute {
+      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }
+    }
+    assertThat(stays).hasSize(1)
+    with(stays.single()) {
+      assertThat(arrivedAt).isEqualTo(admission.occurredAt)
+      assertThat(departedAt).isEqualTo(death.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+    val episode = stays.single().episode
+    assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
+    assertThat(episode.concludedAt).isEqualTo(death.occurredAt)
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.DECEASED)
   }
 }

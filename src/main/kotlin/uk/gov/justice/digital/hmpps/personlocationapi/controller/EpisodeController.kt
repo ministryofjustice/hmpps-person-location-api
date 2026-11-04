@@ -1,6 +1,10 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.controller
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.responses.ApiResponse
+import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
@@ -9,8 +13,11 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import uk.gov.justice.digital.hmpps.personlocationapi.access.Roles
 import uk.gov.justice.digital.hmpps.personlocationapi.config.OpenApiTags.INTEGRATIONS
+import uk.gov.justice.digital.hmpps.personlocationapi.exception.NotFoundException
+import uk.gov.justice.digital.hmpps.personlocationapi.model.episode.PeriodOfCustody
 import uk.gov.justice.digital.hmpps.personlocationapi.model.episode.PeriodsOfCustody
 import uk.gov.justice.digital.hmpps.personlocationapi.service.RetrieveEpisodes
+import uk.gov.justice.hmpps.kotlin.common.ErrorResponse
 
 @Tag(name = INTEGRATIONS)
 @RestController
@@ -18,6 +25,43 @@ import uk.gov.justice.digital.hmpps.personlocationapi.service.RetrieveEpisodes
 @PreAuthorize("hasRole('${Roles.PERSON_PERIODS_RO}')")
 class EpisodeController(private val retrieve: RetrieveEpisodes) {
   @Operation(summary = "Retrieve periods of custody ordered in reverse chronological order (most recent first).")
+  @ApiResponses(
+    value = [
+      ApiResponse(
+        responseCode = "401",
+        description = "Unauthorised, requires a valid Oauth2 token",
+        content = [Content(schema = Schema(implementation = ErrorResponse::class))],
+      ),
+      ApiResponse(
+        responseCode = "403",
+        description = "Forbidden, requires an appropriate role",
+        content = [Content(schema = Schema(implementation = ErrorResponse::class))],
+      ),
+    ],
+  )
   @GetMapping("/periods-of-custody")
   fun periodsOfCustodyFor(@PathVariable personIdentifier: String): PeriodsOfCustody = retrieve.periodsOfCustodyFor(personIdentifier)
+
+  @Operation(summary = "Retrieve the most recent period of custody if one exists. The status and concluded date can be used to determine if it is current.")
+  @ApiResponses(
+    value = [
+      ApiResponse(
+        responseCode = "401",
+        description = "Unauthorised, requires a valid Oauth2 token",
+        content = [Content(schema = Schema(implementation = ErrorResponse::class))],
+      ),
+      ApiResponse(
+        responseCode = "403",
+        description = "Forbidden, requires an appropriate role",
+        content = [Content(schema = Schema(implementation = ErrorResponse::class))],
+      ),
+      ApiResponse(
+        responseCode = "404",
+        description = "No period of custody exists for the provided identifier",
+        content = [Content(schema = Schema(implementation = ErrorResponse::class))],
+      ),
+    ],
+  )
+  @GetMapping("/periods-of-custody/latest")
+  fun latestPeriodFor(@PathVariable personIdentifier: String): PeriodOfCustody = retrieve.latestPeriodFor(personIdentifier) ?: throw NotFoundException("No period of custody found for the provided identifier.")
 }

@@ -13,6 +13,13 @@ data class PeriodOfCustody(
   val concludedAt: LocalDateTime?,
   @Schema(description = "The status of the period of custody. Code and human readable description.")
   val status: CodedDescription,
+  @Schema(description = "Information about the previous period of custody, where one exists.")
+  val previousPeriod: PreviousPeriod?,
+)
+
+data class PreviousPeriod(
+  @Schema(description = "Date the previous period of custody concluded.")
+  val concludedAt: LocalDateTime,
 )
 
 data class PeriodsOfCustody(val periodsOfCustody: List<PeriodOfCustody>)
@@ -22,4 +29,4 @@ private fun CustodialEpisode.Status.asCodedDescription(): CodedDescription = whe
   else -> CodedDescription(name, name.first().uppercase() + name.substring(1).lowercase().replace("_", " "))
 }
 
-fun CustodialEpisode.asPeriodOfCustody(): PeriodOfCustody = PeriodOfCustody(commencedAt, concludedAt, status.asCodedDescription())
+fun CustodialEpisode.asPeriodOfCustody(previous: CustodialEpisode?): PeriodOfCustody = PeriodOfCustody(commencedAt, concludedAt, status.asCodedDescription(), previous?.concludedAt?.let(::PreviousPeriod))

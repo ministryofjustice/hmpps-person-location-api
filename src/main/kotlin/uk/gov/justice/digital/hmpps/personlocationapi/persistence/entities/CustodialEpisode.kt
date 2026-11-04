@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Size
 import org.hibernate.annotations.JdbcType
 import org.hibernate.dialect.type.PostgreSQLEnumJdbcType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
@@ -100,4 +101,14 @@ final class CustodialEpisode(
 
 interface CustodialEpisodeRepository : JpaRepository<CustodialEpisode, UUID> {
   fun findAllByPersonIdentifier(personIdentifier: String): MutableList<CustodialEpisode>
+
+  @Query(
+    """
+    select ce from CustodialEpisode ce
+    where ce.personIdentifier = :personIdentifier
+    order by ce.commencedAt desc
+    limit 2
+  """,
+  )
+  fun findMostRecentFor(personIdentifier: String): List<CustodialEpisode>
 }

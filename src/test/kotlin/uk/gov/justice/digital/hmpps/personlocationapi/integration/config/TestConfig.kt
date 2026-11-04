@@ -4,6 +4,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.transaction.support.TransactionTemplate
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialEpisodeRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeriesRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.HmppsDomainEventRepository
 
@@ -13,6 +14,7 @@ class TestConfig(
   private val hmppsDomainEventRepository: HmppsDomainEventRepository,
   private val seriesRepository: CustodialSeriesRepository,
   private val movementRepository: ExternalMovementRepository,
+  private val episodeRepository: CustodialEpisodeRepository,
 ) {
   @Bean
   fun hmppsDomainEventOperations(): HmppsDomainEventOperations = HmppsDomainEventOperationsImpl(transactionTemplate, hmppsDomainEventRepository)
@@ -22,4 +24,7 @@ class TestConfig(
 
   @Bean
   fun externalMovementOperations() = ExternalMovementOperationsImpl(movementRepository)
+
+  @Bean
+  fun custodialEpisodeOperations() = CustodialEpisodeOperationsImpl(episodeRepository)
 }

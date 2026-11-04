@@ -55,19 +55,24 @@ final class CustodialEpisode(
   var concludedAt: LocalDateTime? = concludedAt
     private set
 
-  internal fun updateStatusFrom(stay: PrisonStay) = apply {
-    if (stay.status != PrisonStay.Status.RELEASED) return@apply
-    val reason = stay.movements().last { it.journeyType == ExternalJourney.Type.RELEASE }.reason as CodedReason
+  internal fun updateStatusFrom(movement: ExternalMovement) = apply {
+    val reason = movement.reason as CodedReason
     status = when {
       reason.isAbscondedOrEscaped() -> Status.UAL
       reason.isDeceased() -> Status.DECEASED
       else -> Status.COMPLETED
     }
     concludedAt = if (status == Status.COMPLETED || status == Status.DECEASED) {
-      stay.departedAt
+      movement.occurredAt
     } else {
       null
     }
+  }
+
+  internal fun updateStatusFrom(stay: PrisonStay) = apply {
+    if (stay.status != PrisonStay.Status.RELEASED) return@apply
+    val lastMovement = stay.movements().last { it.journeyType == ExternalJourney.Type.RELEASE }
+    updateStatusFrom(lastMovement)
   }
 
   @OneToMany(mappedBy = "episode")

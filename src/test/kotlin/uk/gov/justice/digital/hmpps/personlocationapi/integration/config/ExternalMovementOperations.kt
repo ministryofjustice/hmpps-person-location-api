@@ -16,6 +16,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Prison
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.SimpleLocation
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReference
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 typealias ExternalMovementProvider = () -> ExternalMovement
@@ -56,7 +57,7 @@ class ExternalMovementOperationsImpl(
         journeyType,
         movementType,
         reason,
-        occurredAt,
+        occurredAt.truncatedTo(ChronoUnit.SECONDS),
         origin,
         destination,
         notes,

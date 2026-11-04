@@ -79,6 +79,7 @@ class RefreshExternalMovementIntervals(
 
       currentJourney?.applyMovement(movement)
       currentStay?.applyMovement(movement)?.also { currentEpisode?.applyStay(it) }
+      currentEpisode?.takeIf { currentStay == null }?.updateStatusFrom(movement)
     }
 
     val (std, stk) = stays.partition { it.movements().isEmpty() }

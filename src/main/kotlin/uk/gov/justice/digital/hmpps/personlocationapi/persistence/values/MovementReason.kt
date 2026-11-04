@@ -1,5 +1,6 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.persistence.values
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import io.swagger.v3.oas.annotations.media.DiscriminatorMapping
@@ -28,7 +29,21 @@ sealed interface MovementReason {
 }
 
 @Schema(description = "Standard reference data code and description", name = CODED_REASON)
-data class CodedReason(val code: String, override val description: String) : MovementReason
+data class CodedReason(val code: String, override val description: String) : MovementReason {
+  @JsonIgnore
+  fun isAbscondedOrEscaped(): Boolean = code in ABSCONDED_CODES
+
+  @JsonIgnore
+  fun isDeceased(): Boolean = code == DECEASED
+
+  companion object {
+    private const val DECEASED = "DEC"
+    private const val UNLAWFULLY_AT_LARGE = "UAL"
+    private const val ESCAPED = "ESC"
+    private const val ABSCOND_END_OF_LICENCE = "UAL_ECL"
+    private val ABSCONDED_CODES = listOf(UNLAWFULLY_AT_LARGE, ESCAPED, ABSCOND_END_OF_LICENCE)
+  }
+}
 
 @Schema(description = "More complex hierarchies of reference data such as TAP", name = HIERARCHICAL_REASON)
 data class HierarchicalReason(

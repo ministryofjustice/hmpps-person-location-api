@@ -10,8 +10,10 @@ import jakarta.validation.constraints.Size
 import org.hibernate.annotations.JdbcType
 import org.hibernate.dialect.type.PostgreSQLEnumJdbcType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
 import java.time.LocalDateTime
 import java.util.Collections
 import java.util.UUID
@@ -53,9 +55,24 @@ final class CustodialEpisode(
   var concludedAt: LocalDateTime? = concludedAt
     private set
 
-  internal fun concludeEpisode(dateTime: LocalDateTime, status: Status) = apply {
-    this.concludedAt = dateTime
-    this.status = status
+  internal fun updateStatusFrom(movement: ExternalMovement) = apply {
+    val reason = movement.reason as CodedReason
+    status = when {
+      reason.isAbscondedOrEscaped() -> Status.UAL
+      reason.isDeceased() -> Status.DECEASED
+      else -> Status.COMPLETED
+    }
+    concludedAt = if (status == Status.COMPLETED || status == Status.DECEASED) {
+      movement.occurredAt
+    } else {
+      null
+    }
+  }
+
+  internal fun updateStatusFrom(stay: PrisonStay) = apply {
+    if (stay.status != PrisonStay.Status.RELEASED) return@apply
+    val lastMovement = stay.movements().last { it.journeyType == ExternalJourney.Type.RELEASE }
+    updateStatusFrom(lastMovement)
   }
 
   @OneToMany(mappedBy = "episode")
@@ -65,12 +82,7 @@ final class CustodialEpisode(
 
   fun resetStays(after: LocalDateTime?) = apply {
     stays.removeIf { after == null || !it.arrivedAt.isBefore(after) }
-    stays.maxByOrNull { it.arrivedAt }?.also {
-      if (it.status == PrisonStay.Status.RELEASED) {
-        concludedAt = it.departedAt
-        status = Status.COMPLETED
-      }
-    }
+    stays.maxByOrNull { it.arrivedAt }?.also { updateStatusFrom(it) }
   }
 
   fun activeAfter(dateTime: LocalDateTime): Boolean = !commencedAt.isAfter(dateTime) && concludedAt?.isAfter(dateTime) != false
@@ -78,15 +90,13 @@ final class CustodialEpisode(
   fun applyStay(stay: PrisonStay) = apply {
     if (stays.isEmpty()) {
       commencedAt = stay.arrivedAt
+      concludedAt = null
       status = when (stay.status) {
         PrisonStay.Status.RESIDENT, PrisonStay.Status.TRANSFERRED_OUT -> Status.ACTIVE
         PrisonStay.Status.IN_TRANSIT_EXTERNAL -> Status.TEMPORARY_ABSENCE
         PrisonStay.Status.RELEASED -> Status.COMPLETED
       }
-      if (stay.status == PrisonStay.Status.RELEASED) {
-        concludedAt = stay.departedAt
-        status = Status.COMPLETED
-      }
+      updateStatusFrom(stay)
     }
     stays.add(stay.applyEpisode(this))
   }
@@ -96,4 +106,14 @@ final class CustodialEpisode(
 
 interface CustodialEpisodeRepository : JpaRepository<CustodialEpisode, UUID> {
   fun findAllByPersonIdentifier(personIdentifier: String): MutableList<CustodialEpisode>
+
+  @Query(
+    """
+    select ce from CustodialEpisode ce
+    where ce.personIdentifier = :personIdentifier
+    order by ce.commencedAt desc
+    limit 2
+  """,
+  )
+  fun findMostRecentFor(personIdentifier: String): List<CustodialEpisode>
 }

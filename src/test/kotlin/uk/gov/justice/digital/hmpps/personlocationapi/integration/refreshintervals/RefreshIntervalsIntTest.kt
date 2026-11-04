@@ -21,6 +21,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.Exter
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStay
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStayRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.SimpleLocation
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReferenceEntity
 import uk.gov.justice.digital.hmpps.personlocationapi.service.RefreshExternalMovementIntervals
 import java.time.LocalDate
@@ -824,6 +825,61 @@ class RefreshIntervalsIntTest(
     assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
     assertThat(episode.concludedAt).isNull()
     assertThat(episode.status).isEqualTo(CustodialEpisode.Status.UAL)
+  }
+
+  @Test
+  fun `UAL custodial episode ended by subsequent release`() {
+    val personIdentifier = personIdentifier()
+    val start = LocalDate.now().atTime(9, 30).minusDays(90)
+    val series = givenSeries(custodialSeries(personIdentifier, openedAt = start))
+    val prisonOne = prison()
+    val admission = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = start,
+      ),
+    )
+    val ual = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        reason = CodedReason("UAL", "Unlawfully at large"),
+        origin = prisonOne,
+        destination = null,
+        occurredAt = start.plusDays(4),
+      ),
+    )
+    val release = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        reason = CodedReason("RE", "Repatriated via prison transfer"),
+        origin = prisonOne,
+        destination = SimpleLocation("OUTSIDE"),
+        occurredAt = start.plusWeeks(12),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stays = transactionTemplate.execute {
+      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }
+    }
+    assertThat(stays).hasSize(1)
+    with(stays.single()) {
+      assertThat(arrivedAt).isEqualTo(admission.occurredAt)
+      assertThat(departedAt).isEqualTo(ual.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+    val episode = stays.single().episode
+    assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
+    assertThat(episode.concludedAt).isEqualTo(release.occurredAt)
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
   }
 
   @Test

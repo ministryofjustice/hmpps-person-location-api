@@ -4,119 +4,155 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.RefreshPersonMovementIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.TargetEpisode
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.TargetInterval
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.TargetJourney
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.TargetStay
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.asEntity
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.deduplicateAndPrioritize
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialEpisode
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialEpisodeRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalJourney
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalJourneyRepository
-import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.MovementInterval
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.MovementIntervalRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStay
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStayRepository
-import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Prison
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.findActiveOrAfter
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.findFromCutoffOnward
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.mergeEntities
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.projectIntervals
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.projectTimeline
 
 @Transactional
 @Service
 class RefreshExternalMovementIntervals(
   private val movementRepository: ExternalMovementRepository,
-  private val episodeRepository: CustodialEpisodeRepository,
+  private val intervalRepository: MovementIntervalRepository,
   private val stayRepository: PrisonStayRepository,
+  private val episodeRepository: CustodialEpisodeRepository,
   private val journeyRepository: ExternalJourneyRepository,
 ) {
-  fun execute(event: RefreshPersonMovementIntervals) {
-    val ep = episodeRepository.findAllByPersonIdentifier(event.personIdentifier)
-      .asSequence()
-      .sortedBy { it.commencedAt }
-      .dropWhile { e -> event.refreshFrom != null && e.concludedAt != null && e.concludedAt!!.isBefore(event.refreshFrom) }
-      .onEach { e -> e.resetStays(event.refreshFrom) }
-      .toCollection(ArrayDeque())
-    val st = stayRepository.findAllByPersonIdentifier(event.personIdentifier)
-      .asSequence()
-      .sortedBy { it.arrivedAt }
-      .dropWhile { e -> event.refreshFrom != null && e.departedAt != null && e.departedAt!!.isBefore(event.refreshFrom) }
-      .onEach { s -> s.resetMovements(event.refreshFrom) }
-      .toCollection(ArrayDeque())
-    val movements = movementRepository.findByPersonIdentifier(event.personIdentifier)
-      .filter { event.refreshFrom == null || !it.occurredAt.isBefore(event.refreshFrom) }
-      .sortedBy { it.occurredAt }
-    val movementIds = movements.map { m -> m.id }.toSet()
-    val ejs = journeyRepository.findFindAllByMovementsIdIn(movementIds)
-      .asSequence()
-      .flatMap { j -> j.movements().map { it to j } }
-      .sortedBy { it.first.occurredAt }
-      .map { it.second }
-      .distinctBy { it.id }
-      .onEach { j -> j.resetMovements(event.refreshFrom) }
-      .toCollection(ArrayDeque())
-
-    journeyRepository.removeMovementLinks(movementIds)
-    stayRepository.removeMovementLinks(movementIds)
-
-    val episodes = mutableSetOf<CustodialEpisode>()
-    val stays = mutableSetOf<PrisonStay>()
-    val journeys = mutableSetOf<ExternalJourney>()
-    var currentJourney: ExternalJourney? = null
-    var currentStay: PrisonStay? = st.removeFirstOrNull()?.also { stays.add(it) }
-    var currentEpisode: CustodialEpisode? = ep.removeFirstOrNull()?.also { episodes.add(it) }
-    movements.forEach { movement ->
-      currentJourney = currentJourney?.takeIf { it.activeAfter(movement.occurredAt) }
-      currentStay = currentStay?.takeIf { it.activeAfter(movement.occurredAt) }
-      currentEpisode = currentEpisode?.takeIf { it.activeAfter(movement.occurredAt) }
-
-      if (movement.movementType == ExternalMovement.Type.DEPARTURE && movement.origin is Prison && movement.journeyType != ExternalJourney.Type.RELEASE) {
-        if (currentJourney == null) {
-          currentJourney = (ejs.removeFirstOrNull() ?: movement.newJourney()).also { journeys.add(it) }
-        }
-      }
-
-      if (movement.movementType == ExternalMovement.Type.ARRIVAL && movement.destination is Prison) {
-        if (currentEpisode == null) {
-          currentEpisode = (ep.removeFirstOrNull() ?: movement.newEpisode()).also { episodes.add(it) }
-        }
-        if (currentStay == null || currentStay.prisonCode != (movement.destination as Prison).code) {
-          currentStay?.transferOut(movement.occurredAt)
-          currentStay = (st.removeFirstOrNull() ?: movement.newStay(currentEpisode)).also { stays.add(it) }
-        }
-      }
-
-      currentJourney?.applyMovement(movement)
-      currentStay?.applyMovement(movement)?.also { currentEpisode?.applyStay(it) }
-      currentEpisode?.takeIf { currentStay == null }?.updateStatusFrom(movement)
+  fun execute(event: RefreshPersonMovementIntervals): Unit = with(event) {
+    val allMovements = movementRepository.findByPersonIdentifier(personIdentifier).sortedBy { it.occurredAt }
+    if (allMovements.isEmpty()) {
+      deleteAllProjectionsFrom(personIdentifier)
+      return
     }
 
-    val (std, stk) = stays.partition { it.movements().isEmpty() }
-    val (etd, etk) = episodes.partition { it.stays().isEmpty() }
-    val (jtd, jtk) = journeys.partition { it.movements().isEmpty() }
+    val lastMovementBeforeRefresh = event.refreshFrom?.let { refreshFrom ->
+      allMovements.lastOrNull { it.occurredAt.isBefore(refreshFrom) }
+    }
+    val effectiveRefreshFrom = lastMovementBeforeRefresh?.occurredAt ?: event.refreshFrom
 
-    stayRepository.deleteAll(st + std)
-    episodeRepository.deleteAll(ep + etd)
-    journeyRepository.deleteAll(ejs + jtd)
-    episodeRepository.saveAll(etk)
-    stayRepository.saveAll(stk)
-    journeyRepository.saveAll(jtk)
+    val existingEpisodes = episodeRepository.findActiveOrAfter(personIdentifier, effectiveRefreshFrom)
+    val existingStays = stayRepository.findActiveOrAfter(personIdentifier, effectiveRefreshFrom)
+    val existingJourneys = journeyRepository.findActiveOrAfter(personIdentifier, effectiveRefreshFrom)
+    val existingIntervals = intervalRepository.findFromCutoffOnward(personIdentifier, effectiveRefreshFrom)
+
+    val replayStartAt = listOfNotNull(
+      effectiveRefreshFrom,
+      existingEpisodes.minOfOrNull { it.commencedAt },
+      existingStays.minOfOrNull { it.arrivedAt },
+      existingJourneys.minOfOrNull { it.commencedAt },
+      existingIntervals.minOfOrNull { it.validFrom },
+    ).minOrNull()
+
+    val deduplicatedMovements = allMovements
+      .filter { replayStartAt == null || !it.occurredAt.isBefore(replayStartAt) }
+      .deduplicateAndPrioritize()
+
+    val targetIntervals = deduplicatedMovements.projectIntervals(effectiveRefreshFrom)
+    val targetTimeline = deduplicatedMovements.projectTimeline()
+
+    val activeTargetEpisodes = targetTimeline.episodes.filter {
+      effectiveRefreshFrom == null || it.concludedAt == null || !it.concludedAt!!.isBefore(effectiveRefreshFrom)
+    }
+    val activeTargetStays = targetTimeline.stays.filter {
+      effectiveRefreshFrom == null || it.departedAt == null || !it.departedAt!!.isBefore(effectiveRefreshFrom)
+    }
+    val activeTargetJourneys = targetTimeline.journeys.filter {
+      effectiveRefreshFrom == null || it.concludedAt == null || !it.concludedAt!!.isBefore(effectiveRefreshFrom)
+    }
+
+    mergeIntervals(personIdentifier, existingIntervals, targetIntervals)
+    mergeStays(personIdentifier, existingStays, activeTargetStays)
+    mergeEpisodes(personIdentifier, existingEpisodes, activeTargetEpisodes)
+    mergeJourneys(personIdentifier, existingJourneys, activeTargetJourneys)
+  }
+
+  private fun mergeIntervals(
+    personIdentifier: String,
+    existing: List<MovementInterval>,
+    targets: List<TargetInterval>,
+  ) {
+    mergeEntities(
+      existing,
+      targets,
+      MovementInterval::validFrom,
+      TargetInterval::validFrom,
+      MovementInterval::matchTarget,
+      { target -> target.asEntity(personIdentifier) },
+      intervalRepository::deleteAll,
+      intervalRepository::saveAll,
+    )
+  }
+
+  private fun mergeStays(
+    personIdentifier: String,
+    existing: List<PrisonStay>,
+    targets: List<TargetStay>,
+  ) {
+    mergeEntities(
+      existing,
+      targets,
+      PrisonStay::arrivedAt,
+      TargetStay::arrivedAt,
+      PrisonStay::matchTarget,
+      { target -> target.asEntity(personIdentifier) },
+      stayRepository::deleteAll,
+      stayRepository::saveAll,
+    )
+  }
+
+  private fun mergeEpisodes(
+    personIdentifier: String,
+    existing: List<CustodialEpisode>,
+    targets: List<TargetEpisode>,
+  ) {
+    mergeEntities(
+      existing,
+      targets,
+      CustodialEpisode::commencedAt,
+      TargetEpisode::commencedAt,
+      CustodialEpisode::matchTarget,
+      { target -> target.asEntity(personIdentifier) },
+      episodeRepository::deleteAll,
+      episodeRepository::saveAll,
+    )
+  }
+
+  private fun mergeJourneys(
+    personIdentifier: String,
+    existing: List<ExternalJourney>,
+    targets: List<TargetJourney>,
+  ) {
+    mergeEntities(
+      existing,
+      targets,
+      ExternalJourney::commencedAt,
+      TargetJourney::commencedAt,
+      ExternalJourney::matchTarget,
+      { target -> target.asEntity(personIdentifier) },
+      journeyRepository::deleteAll,
+      journeyRepository::saveAll,
+    )
+  }
+
+  private fun deleteAllProjectionsFrom(personIdentifier: String) {
+    intervalRepository.deleteAllByPersonIdentifier(personIdentifier)
+    journeyRepository.deleteAllByPersonIdentifier(personIdentifier)
+    stayRepository.deleteAllByPersonIdentifier(personIdentifier)
+    episodeRepository.deleteAllByPersonIdentifier(personIdentifier)
   }
 }
-
-private fun ExternalMovement.newEpisode() = CustodialEpisode(
-  personIdentifier,
-  CustodialEpisode.Status.ACTIVE,
-  occurredAt,
-  null,
-)
-
-private fun ExternalMovement.newStay(episode: CustodialEpisode) = PrisonStay(
-  episode,
-  (destination as Prison).code,
-  PrisonStay.Status.RESIDENT,
-  occurredAt,
-  null,
-)
-
-private fun ExternalMovement.newJourney() = ExternalJourney(
-  personIdentifier,
-  journeyType,
-  ExternalJourney.Status.IN_TRANSIT,
-  occurredAt,
-  null,
-  (origin as Prison).code,
-  null,
-  scheduleReference,
-)

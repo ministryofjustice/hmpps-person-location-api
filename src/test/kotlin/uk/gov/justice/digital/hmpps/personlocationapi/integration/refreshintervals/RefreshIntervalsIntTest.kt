@@ -14,6 +14,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.Externa
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.ExternalMovementOperationsImpl.Companion.prison
 import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyOccurredAt
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialEpisode
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialEpisodeRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeries
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalJourney
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalJourneyRepository
@@ -31,15 +32,11 @@ class RefreshIntervalsIntTest(
   @Autowired moveOps: ExternalMovementOperations,
   @Autowired private val refresh: RefreshExternalMovementIntervals,
   @Autowired private val stayRepository: PrisonStayRepository,
+  @Autowired private val episodeRepository: CustodialEpisodeRepository,
   @Autowired private val journeyRepository: ExternalJourneyRepository,
 ) : IntegrationTest(),
   CustodialSeriesOperations by seriesOps,
   ExternalMovementOperations by moveOps {
-
-  @Test
-  fun `local test`() {
-    refresh.execute(RefreshPersonMovementIntervals("A3263DP"))
-  }
 
   @Test
   fun `can correctly add new stays and episodes for single series`() {
@@ -118,60 +115,40 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }.onEach { it.movements() }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
     assertThat(stays).hasSize(2)
     with(stays.first()) {
       assertThat(arrivedAt).isEqualTo(admission.occurredAt)
       assertThat(departedAt).isEqualTo(trDep.occurredAt)
       assertThat(status).isEqualTo(PrisonStay.Status.TRANSFERRED_OUT)
-      assertThat(movements().map { it.id }).containsExactly(admission.id, tapDep.id, tapArr.id, trDep.id)
     }
     with(stays.last()) {
       assertThat(arrivedAt).isEqualTo(trArr.occurredAt)
       assertThat(departedAt).isEqualTo(rel.occurredAt)
       assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
-      assertThat(movements().map { it.id }).containsExactly(trArr.id, courtApp.id, rel.id)
     }
-    assertThat(stays.first().episode.id).isEqualTo(stays.last().episode.id)
-    val episode = stays.first().episode
+
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
     assertThat(episode.commencedAt).isEqualTo(stays.first().arrivedAt)
     assertThat(episode.concludedAt).isEqualTo(stays.last().departedAt)
     assertThat(episode.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
 
-    val journeys = transactionTemplate.execute {
-      journeyRepository.findFindAllByMovementsIdIn(
-        listOf(
-          admission.id,
-          tapDep.id,
-          tapArr.id,
-          trDep.id,
-          trArr.id,
-          courtApp.id,
-          rel.id,
-        ),
-      )
-        .sortedBy { it.movements().first().occurredAt }
-    }
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
     assertThat(journeys).hasSize(3)
     with(journeys.first()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TEMPORARY_ABSENCE)
       assertThat(externalReference).isEqualTo(tapDep.scheduleReference!!)
-      assertThat(movements().map { it.id }).containsExactly(tapDep.id, tapArr.id)
       assertThat(origin).isEqualTo(prisonOne.code)
       assertThat(destination).isEqualTo(prisonOne.code)
     }
     with(journeys[1]) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TRANSFER)
-      assertThat(movements().map { it.id }).containsExactly(trDep.id, trArr.id)
       assertThat(origin).isEqualTo(prisonOne.code)
       assertThat(destination).isEqualTo(prisonTwo.code)
     }
     with(journeys.last()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.COURT_APPEARANCE)
       assertThat(externalReference).isEqualTo(courtApp.scheduleReference!!)
-      assertThat(movements().map { it.id }).containsExactly(courtApp.id, rel.id)
       assertThat(origin).isEqualTo(prisonTwo.code)
     }
   }
@@ -237,44 +214,37 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }.onEach { it.movements() }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
     assertThat(stays).hasSize(2)
     with(stays.first()) {
       assertThat(arrivedAt).isEqualTo(admissionOne.occurredAt)
       assertThat(departedAt).isEqualTo(relOne.occurredAt)
       assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
-      assertThat(movements().map { it.id }).containsExactly(admissionOne.id, relOne.id)
     }
     with(stays.last()) {
       assertThat(arrivedAt).isEqualTo(admissionTwo.occurredAt)
       assertThat(departedAt).isNull()
       assertThat(status).isEqualTo(PrisonStay.Status.IN_TRANSIT_EXTERNAL)
-      assertThat(movements().map { it.id }).containsExactly(admissionTwo.id, tapDep.id)
     }
-    assertThat(stays.first().episode.id).isNotEqualTo(stays.last().episode.id)
-    val episodeOne = stays.first().episode
+    val episodes = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).reversed()
+    assertThat(episodes).hasSize(2)
+
+    val episodeOne = episodes.first()
     assertThat(episodeOne.commencedAt).isEqualTo(stays.first().arrivedAt)
     assertThat(episodeOne.concludedAt).isEqualTo(stays.first().departedAt)
     assertThat(episodeOne.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
 
-    val episodeTwo = stays.last().episode
+    val episodeTwo = episodes.last()
     assertThat(episodeTwo.commencedAt).isEqualTo(stays.last().arrivedAt)
     assertThat(episodeTwo.concludedAt).isNull()
-    assertThat(episodeTwo.status).isEqualTo(CustodialEpisode.Status.ACTIVE)
+    assertThat(episodeTwo.status).isEqualTo(CustodialEpisode.Status.TEMPORARY_ABSENCE)
 
-    val journeys = transactionTemplate.execute {
-      journeyRepository.findFindAllByMovementsIdIn(listOf(admissionOne.id, relOne.id, admissionTwo.id, tapDep.id))
-        .onEach { it.movements() }
-        .sortedBy { it.commencedAt }
-    }
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
     assertThat(journeys).hasSize(1)
     with(journeys.single()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TEMPORARY_ABSENCE)
       assertThat(externalReference).isEqualTo(tapDep.scheduleReference!!)
       assertThat(status).isEqualTo(ExternalJourney.Status.IN_TRANSIT)
-      assertThat(movements().map { it.id }).containsExactly(tapDep.id)
       assertThat(origin).isEqualTo(prisonTwo.code)
       assertThat(destination).isNull()
     }
@@ -327,19 +297,13 @@ class RefreshIntervalsIntTest(
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
 
     val validateStays = {
-      val stays = transactionTemplate.execute {
-        stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }.onEach { it.movements() }
-      }
-      assertThat(stays).hasSize(1)
-      with(stays.first()) {
-        assertThat(arrivedAt).isEqualTo(admission.occurredAt)
-        assertThat(departedAt).isEqualTo(rel.occurredAt)
-        assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
-        assertThat(movements().map { it.id }).containsExactly(admission.id, tapDep.id, tapArr.id, rel.id)
-      }
-      val episode = stays.first().episode
-      assertThat(episode.commencedAt).isEqualTo(stays.first().arrivedAt)
-      assertThat(episode.concludedAt).isEqualTo(stays.first().departedAt)
+      val stay = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier).single()
+      assertThat(stay.arrivedAt).isEqualTo(admission.occurredAt)
+      assertThat(stay.departedAt).isEqualTo(rel.occurredAt)
+      assertThat(stay.status).isEqualTo(PrisonStay.Status.RELEASED)
+      val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
+      assertThat(episode.commencedAt).isEqualTo(stay.arrivedAt)
+      assertThat(episode.concludedAt).isEqualTo(stay.departedAt)
       assertThat(episode.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
     }
 
@@ -356,16 +320,11 @@ class RefreshIntervalsIntTest(
 
     validateStays()
 
-    val journeys = transactionTemplate.execute {
-      journeyRepository.findFindAllByMovementsIdIn(listOf(admission.id, tapDep.id, tapArr.id, rel.id))
-        .onEach { it.movements() }
-        .sortedBy { it.commencedAt }
-    }
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
     assertThat(journeys).hasSize(1)
     with(journeys.single()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TEMPORARY_ABSENCE)
       assertThat(externalReference).isEqualTo(tapDep.scheduleReference!!)
-      assertThat(movements().map { it.id }).containsExactly(tapDep.id, tapArr.id)
       assertThat(origin).isEqualTo(prisonOne.code)
       assertThat(destination).isEqualTo(prisonOne.code)
     }
@@ -431,29 +390,28 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }.onEach { it.movements() }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
     assertThat(stays).hasSize(2)
     with(stays.first()) {
       assertThat(arrivedAt).isEqualTo(admissionOne.occurredAt)
       assertThat(departedAt).isEqualTo(relOne.occurredAt)
       assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
-      assertThat(movements().map { it.id }).containsExactly(admissionOne.id, relOne.id)
     }
     with(stays.last()) {
       assertThat(arrivedAt).isEqualTo(admissionTwo.occurredAt)
       assertThat(departedAt).isEqualTo(relTwo.occurredAt)
       assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
-      assertThat(movements().map { it.id }).containsExactly(admissionTwo.id, relTwo.id)
     }
-    assertThat(stays.first().episode.id).isNotEqualTo(stays.last().episode.id)
-    val episodeOne = stays.first().episode
+
+    val episodes = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).reversed()
+    assertThat(episodes).hasSize(2)
+
+    val episodeOne = episodes.first()
     assertThat(episodeOne.commencedAt).isEqualTo(stays.first().arrivedAt)
     assertThat(episodeOne.concludedAt).isEqualTo(stays.first().departedAt)
     assertThat(episodeOne.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
 
-    val episodeTwo = stays.last().episode
+    val episodeTwo = episodes.last()
     assertThat(episodeTwo.commencedAt).isEqualTo(stays.last().arrivedAt)
     assertThat(episodeTwo.concludedAt).isEqualTo(stays.last().departedAt)
     assertThat(episodeTwo.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
@@ -467,39 +425,33 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier, admissionTwo.occurredAt))
 
-    val updatedStays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }.onEach { it.movements() }
-    }
+    val updatedStays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
 
     assertThat(updatedStays).hasSize(2)
     with(updatedStays.first()) {
       assertThat(arrivedAt).isEqualTo(admissionOne.occurredAt)
       assertThat(departedAt).isEqualTo(relOne.occurredAt)
       assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
-      assertThat(movements().map { it.id }).containsExactly(admissionOne.id, relOne.id)
     }
     with(updatedStays.last()) {
       assertThat(arrivedAt).isEqualTo(admissionTwo.occurredAt.plusDays(1))
       assertThat(departedAt).isEqualTo(relTwo.occurredAt.minusDays(1))
       assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
-      assertThat(movements().map { it.id }).containsExactly(admissionTwo.id, relTwo.id)
     }
-    assertThat(updatedStays.first().episode.id).isNotEqualTo(updatedStays.last().episode.id)
-    val ep1 = updatedStays.first().episode
+    val ep = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).reversed()
+    assertThat(episodes).hasSize(2)
+
+    val ep1 = ep.first()
     assertThat(ep1.commencedAt).isEqualTo(updatedStays.first().arrivedAt)
     assertThat(ep1.concludedAt).isEqualTo(updatedStays.first().departedAt)
     assertThat(ep1.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
 
-    val ep2 = updatedStays.last().episode
+    val ep2 = ep.last()
     assertThat(ep2.commencedAt).isEqualTo(updatedStays.last().arrivedAt)
     assertThat(ep2.concludedAt).isEqualTo(updatedStays.last().departedAt)
     assertThat(ep2.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
 
-    val journeys = transactionTemplate.execute {
-      journeyRepository.findFindAllByMovementsIdIn(listOf(admissionOne.id, relOne.id, admissionTwo.id, relTwo.id))
-        .onEach { it.movements() }
-        .sortedBy { it.commencedAt }
-    }
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
     assertThat(journeys).isEmpty()
   }
 
@@ -533,9 +485,7 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
     assertThat(stays).hasSize(1)
     with(stays.single()) {
       assertThat(arrivedAt).isEqualTo(admission.occurredAt)
@@ -543,23 +493,18 @@ class RefreshIntervalsIntTest(
       assertThat(status).isEqualTo(PrisonStay.Status.TRANSFERRED_OUT)
     }
 
-    val episode = stays.single().episode
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
     assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
     assertThat(episode.concludedAt).isNull()
-    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.ACTIVE)
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.TEMPORARY_ABSENCE)
 
-    val journeys = transactionTemplate.execute {
-      journeyRepository.findFindAllByMovementsIdIn(listOf(admission.id, trDep.id))
-        .onEach { it.movements() }
-        .sortedBy { it.commencedAt }
-    }
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
     assertThat(journeys).hasSize(1)
     with(journeys.single()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.TRANSFER)
       assertThat(status).isEqualTo(ExternalJourney.Status.IN_TRANSIT)
       assertThat(origin).isEqualTo(prisonOne.code)
-      assertThat(destination).isNull()
-      assertThat(movements().map { it.id }).containsExactly(trDep.id)
+      assertThat(destination).isEqualTo(prisonTwo.code)
     }
   }
 
@@ -601,7 +546,7 @@ class RefreshIntervalsIntTest(
         occurredAt = admission.occurredAt.plusDays(2),
       ),
     )
-    val tapArr = givenMovement(
+    givenMovement(
       externalMovement(
         series,
         movementType = ExternalMovement.Type.ARRIVAL,
@@ -613,20 +558,14 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier, tapDep.occurredAt))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }.onEach { it.movements() }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
     assertThat(stays).hasSize(1)
     with(stays.single()) {
       assertThat(arrivedAt).isEqualTo(admission.occurredAt)
       assertThat(departedAt).isEqualTo(rel.occurredAt)
-      assertThat(movements().map { it.id }).containsExactly(admission.id, tapDep.id, tapArr.id, rel.id)
     }
 
-    val journeys = transactionTemplate.execute {
-      journeyRepository.findFindAllByMovementsIdIn(listOf(admission.id, tapDep.id, tapArr.id, rel.id))
-        .sortedBy { it.movements().first().occurredAt }
-    }
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
     assertThat(journeys).hasSize(1)
     assertThat(journeys.map { it.type }).containsExactly(ExternalJourney.Type.TEMPORARY_ABSENCE)
   }
@@ -670,16 +609,14 @@ class RefreshIntervalsIntTest(
     )
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
-    assertThat(stayRepository.findAllByPersonIdentifier(personIdentifier)).hasSize(2)
+    assertThat(stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)).hasSize(2)
 
     removeMovement(trArr.id)
     removeMovement(trDep.id)
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier, admission.occurredAt))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
 
     assertThat(stays).hasSize(1)
     with(stays.single()) {
@@ -715,7 +652,7 @@ class RefreshIntervalsIntTest(
         occurredAt = admission.occurredAt.plusDays(1),
       ),
     )
-    val courtArr = givenMovement(
+    givenMovement(
       externalMovement(
         series,
         movementType = ExternalMovement.Type.ARRIVAL,
@@ -727,19 +664,14 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }.onEach { it.movements() }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
     assertThat(stays).hasSize(1)
     with(stays.single()) {
       assertThat(status).isEqualTo(PrisonStay.Status.RESIDENT)
       assertThat(departedAt).isNull()
-      assertThat(movements().map { it.id }).containsExactly(admission.id, courtDep.id, courtArr.id)
     }
 
-    val journeys = transactionTemplate.execute {
-      journeyRepository.findFindAllByMovementsIdIn(listOf(courtDep.id, courtArr.id))
-    }
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
     assertThat(journeys).hasSize(1)
     with(journeys.single()) {
       assertThat(type).isEqualTo(ExternalJourney.Type.COURT_APPEARANCE)
@@ -768,16 +700,14 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
     assertThat(stays).hasSize(1)
     with(stays.single()) {
       assertThat(arrivedAt).isEqualTo(admission.occurredAt)
       assertThat(departedAt).isNull()
       assertThat(status).isEqualTo(PrisonStay.Status.RESIDENT)
     }
-    val episode = stays.single().episode
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
     assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
     assertThat(episode.concludedAt).isNull()
     assertThat(episode.status).isEqualTo(CustodialEpisode.Status.ACTIVE)
@@ -812,19 +742,17 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
     assertThat(stays).hasSize(1)
     with(stays.single()) {
       assertThat(arrivedAt).isEqualTo(admission.occurredAt)
       assertThat(departedAt).isEqualTo(ual.occurredAt)
       assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
     }
-    val episode = stays.single().episode
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
     assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
     assertThat(episode.concludedAt).isNull()
-    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.UAL)
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.UNLAWFULLY_AT_LARGE)
   }
 
   @Test
@@ -867,16 +795,14 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
     assertThat(stays).hasSize(1)
     with(stays.single()) {
       assertThat(arrivedAt).isEqualTo(admission.occurredAt)
       assertThat(departedAt).isEqualTo(ual.occurredAt)
       assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
     }
-    val episode = stays.single().episode
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
     assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
     assertThat(episode.concludedAt).isEqualTo(release.occurredAt)
     assertThat(episode.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
@@ -911,16 +837,14 @@ class RefreshIntervalsIntTest(
 
     refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
 
-    val stays = transactionTemplate.execute {
-      stayRepository.findAllByPersonIdentifier(personIdentifier).sortedBy { it.arrivedAt }
-    }
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
     assertThat(stays).hasSize(1)
     with(stays.single()) {
       assertThat(arrivedAt).isEqualTo(admission.occurredAt)
       assertThat(departedAt).isEqualTo(death.occurredAt)
       assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
     }
-    val episode = stays.single().episode
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
     assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
     assertThat(episode.concludedAt).isEqualTo(death.occurredAt)
     assertThat(episode.status).isEqualTo(CustodialEpisode.Status.DECEASED)

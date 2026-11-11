@@ -24,9 +24,6 @@ data class PreviousPeriod(
 
 data class PeriodsOfCustody(val periodsOfCustody: List<PeriodOfCustody>)
 
-private fun CustodialEpisode.Status.asCodedDescription(): CodedDescription = when (this) {
-  CustodialEpisode.Status.UAL -> CodedDescription(name, "Unlawfully at large.")
-  else -> CodedDescription(name, name.first().uppercase() + name.substring(1).lowercase().replace("_", " "))
-}
+private fun CustodialEpisode.Status.asCodedDescription(): CodedDescription = CodedDescription(name, name.first().uppercase() + name.substring(1).lowercase().replace("_", " "))
 
 fun CustodialEpisode.asPeriodOfCustody(previous: CustodialEpisode?): PeriodOfCustody = PeriodOfCustody(commencedAt, concludedAt, status.asCodedDescription(), previous?.concludedAt?.let(::PreviousPeriod))

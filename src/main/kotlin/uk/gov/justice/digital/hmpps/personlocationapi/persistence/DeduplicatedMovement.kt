@@ -115,6 +115,9 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
               if (journeyType == ExternalJourney.Type.TRANSFER) {
                 departedAt = occurredAt
                 status = PrisonStay.Status.TRANSFERRED_OUT
+                if (arrivedAt.isEqual(departedAt)) {
+                  stays.remove(this)
+                }
                 currentStay = null
               } else {
                 status = PrisonStay.Status.IN_TRANSIT_EXTERNAL
@@ -135,7 +138,7 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
         currentJourney?.apply {
           this.concludedAt = occurredAt
           this.destination = destination ?: this.destination
-          if (concludedAt?.isEqual(commencedAt) == true) {
+          if (commencedAt.isEqual(concludedAt)) {
             journeys.remove(this)
           }
         }
@@ -152,6 +155,9 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
             currentStay?.apply {
               departedAt = occurredAt
               status = PrisonStay.Status.TRANSFERRED_OUT
+              if (arrivedAt.isEqual(departedAt)) {
+                stays.remove(this)
+              }
             }
             currentStay = TargetStay(
               arrivedAt = occurredAt,

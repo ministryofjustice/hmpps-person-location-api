@@ -82,6 +82,16 @@ interface PrisonStayRepository : JpaRepository<PrisonStay, UUID> {
     """,
   )
   fun findActiveOrAfterCutoff(personIdentifier: String, cutoff: LocalDateTime): List<PrisonStay>
+
+  @Query(
+    """
+    select ps from PrisonStay ps
+    where ps.personIdentifier = :personIdentifier
+    order by ps.arrivedAt desc
+    limit 1
+  """,
+  )
+  fun findMostRecentFor(personIdentifier: String): PrisonStay?
 }
 
 fun PrisonStayRepository.findActiveOrAfter(personIdentifier: String, cutoff: LocalDateTime?) = cutoff?.let {

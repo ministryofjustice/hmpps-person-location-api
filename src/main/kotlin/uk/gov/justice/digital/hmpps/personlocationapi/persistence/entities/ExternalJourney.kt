@@ -106,6 +106,16 @@ interface ExternalJourneyRepository : JpaRepository<ExternalJourney, UUID> {
     """,
   )
   fun findActiveOrAfterCutoff(personIdentifier: String, cutoff: LocalDateTime): List<ExternalJourney>
+
+  @Query(
+    """
+    select ej from ExternalJourney ej
+    where ej.personIdentifier = :personIdentifier
+    order by ej.commencedAt desc
+    limit 1
+  """,
+  )
+  fun findMostRecentFor(personIdentifier: String): ExternalJourney?
 }
 
 fun ExternalJourneyRepository.findActiveOrAfter(personIdentifier: String, cutoff: LocalDateTime?) = cutoff?.let {

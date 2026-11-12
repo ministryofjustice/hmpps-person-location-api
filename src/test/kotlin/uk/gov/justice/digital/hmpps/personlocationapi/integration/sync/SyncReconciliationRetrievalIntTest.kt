@@ -5,18 +5,25 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import uk.gov.justice.digital.hmpps.personlocationapi.access.Roles
 import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext.Companion.SYSTEM_USERNAME
+import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.RefreshPersonMovementIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.personIdentifier
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.IntegrationTest
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.CustodialSeriesOperations
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.CustodialSeriesOperationsImpl.Companion.custodialSeries
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.ExternalMovementOperations
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.ExternalMovementOperationsImpl.Companion.externalMovement
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeries.Status
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalJourney
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Prison
+import uk.gov.justice.digital.hmpps.personlocationapi.service.RefreshExternalMovementIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.ReconciliationResponse
 import java.time.LocalDateTime
 
 class SyncReconciliationRetrievalIntTest(
   @Autowired seriesOps: CustodialSeriesOperations,
   @Autowired moveOps: ExternalMovementOperations,
+  @Autowired private val refresh: RefreshExternalMovementIntervals,
 ) : IntegrationTest(),
   CustodialSeriesOperations by seriesOps,
   ExternalMovementOperations by moveOps {
@@ -48,16 +55,24 @@ class SyncReconciliationRetrievalIntTest(
     val prevSeries = givenSeries(
       custodialSeries(
         personIdentifier = personIdentifier,
-        status = uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeries.Status.CLOSED,
+        status = Status.CLOSED,
         isActive = false,
         openedAt = LocalDateTime.now().minusDays(7),
         closedAt = LocalDateTime.now().minusDays(5),
       ),
     )
     val series = givenSeries(custodialSeries(personIdentifier))
-    val movement = givenMovement(externalMovement(series))
+    val movement = givenMovement(externalMovement(series, journeyType = ExternalJourney.Type.ADMISSION, movementType = ExternalMovement.Type.ARRIVAL))
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
     val res = getForReconciliation(personIdentifier).successResponse<ReconciliationResponse>()
     assertThat(res.series).hasSize(2)
+
+    with(res.status) {
+      assertThat(inCustody).isTrue
+      assertThat(prisonCode).isEqualTo((movement.destination as Prison).code)
+      assertThat(temporarilyAbsent).isFalse
+    }
 
     val withMovement = res.series.single { it.series.dpsId == series.id }
     series verifyAgainst withMovement.series

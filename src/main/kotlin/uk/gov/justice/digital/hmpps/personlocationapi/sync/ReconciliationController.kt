@@ -19,5 +19,14 @@ class ReconciliationController(private val retrieve: RetrieveForSync) {
   fun reconcile(@PathVariable personIdentifier: String): ReconciliationResponse = retrieve.all(personIdentifier)
 }
 
-data class ReconciliationResponse(val series: List<ReconciliationSeries>)
+data class ReconciliationResponse(val status: ReconciliationPrisonerStatus, val series: List<ReconciliationSeries>)
 data class ReconciliationSeries(val series: CustodialSeries, val movements: List<ExternalMovement>)
+
+data class ReconciliationPrisonerStatus(
+  val inCustody: Boolean,
+  val prisonCode: String?,
+  val temporarilyAbsent: Boolean,
+) {
+  val expectedLegacyInOut: String = if (inCustody && !temporarilyAbsent) "IN" else "OUT"
+  val expectedLegacyActive: String = if (inCustody) "ACTIVE" else "INACTIVE"
+}

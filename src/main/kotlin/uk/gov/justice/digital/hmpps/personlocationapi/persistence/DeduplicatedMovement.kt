@@ -6,6 +6,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.Exter
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStay
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Court
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.HierarchicalReason
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Hospital
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Location
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.MovementReason
@@ -40,7 +41,7 @@ internal fun List<ExternalMovement>.deduplicateAndPrioritize(): List<Deduplicate
       journeyType = key.third,
       origin = duplicates.map { it.origin }.minByOrNull { it.priority() },
       destination = duplicates.map { it.destination }.minByOrNull { it.priority() },
-      reason = duplicates.map { it.reason }.distinct().single(),
+      reason = duplicates.map { it.reason }.distinct().let { if (it.size > 1) HierarchicalReason(it.filterIsInstance<CodedReason>()) else it.single() },
       externalReference = duplicates.firstOrNull { it.scheduleReference != null }?.scheduleReference,
     )
   }.sortedBy { it.occurredAt }
@@ -82,6 +83,9 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
             currentStay?.apply {
               departedAt = occurredAt
               status = PrisonStay.Status.RELEASED
+              if (currentStay.arrivedAt.isEqual(currentStay.departedAt)) {
+                stays.remove(currentStay)
+              }
             }
             currentStay = null
 

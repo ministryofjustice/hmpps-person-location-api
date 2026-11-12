@@ -8,7 +8,6 @@ import jakarta.persistence.Version
 import jakarta.validation.constraints.Size
 import org.hibernate.annotations.JdbcType
 import org.hibernate.dialect.type.PostgreSQLEnumJdbcType
-import org.hibernate.envers.Audited
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
@@ -17,7 +16,6 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.TargetEpisode
 import java.time.LocalDateTime
 import java.util.UUID
 
-@Audited
 @Entity
 @Table(name = "custodial_episode")
 final class CustodialEpisode(

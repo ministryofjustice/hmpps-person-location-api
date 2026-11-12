@@ -6,6 +6,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.Exter
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStay
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Court
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.HierarchicalReason
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Hospital
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Location
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.MovementReason
@@ -32,15 +33,15 @@ private fun Location?.priority(): Int = when (this) {
   null -> 5
 }
 
-internal fun List<ExternalMovement>.deduplicateAndPrioritize(): List<DeduplicatedMovement> = this.groupBy { Triple(it.occurredAt, it.movementType, it.journeyType) }
+internal fun List<ExternalMovement>.deduplicateAndPrioritize(): List<DeduplicatedMovement> = this.groupBy { it.occurredAt to it.movementType }
   .map { (key, duplicates) ->
     DeduplicatedMovement(
       occurredAt = key.first,
       movementType = key.second,
-      journeyType = key.third,
+      journeyType = duplicates.maxBy { it.journeyType.ordinal }.journeyType,
       origin = duplicates.map { it.origin }.minByOrNull { it.priority() },
       destination = duplicates.map { it.destination }.minByOrNull { it.priority() },
-      reason = duplicates.map { it.reason }.distinct().single(),
+      reason = duplicates.map { it.reason }.distinct().let { if (it.size > 1) HierarchicalReason(it.filterIsInstance<CodedReason>()) else it.single() },
       externalReference = duplicates.firstOrNull { it.scheduleReference != null }?.scheduleReference,
     )
   }.sortedBy { it.occurredAt }
@@ -82,6 +83,9 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
             currentStay?.apply {
               departedAt = occurredAt
               status = PrisonStay.Status.RELEASED
+              if (arrivedAt.isEqual(departedAt)) {
+                stays.remove(this)
+              }
             }
             currentStay = null
 
@@ -91,6 +95,9 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
               } else {
                 concludedAt = occurredAt
                 status = if (reason is CodedReason && reason.isDeceased()) CustodialEpisode.Status.DECEASED else CustodialEpisode.Status.COMPLETED
+                if (commencedAt.isEqual(concludedAt)) {
+                  episodes.remove(this)
+                }
                 currentEpisode = null
               }
             }
@@ -128,6 +135,9 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
         currentJourney?.apply {
           this.concludedAt = occurredAt
           this.destination = destination ?: this.destination
+          if (concludedAt?.isEqual(commencedAt) == true) {
+            journeys.remove(this)
+          }
         }
         currentJourney = null
 

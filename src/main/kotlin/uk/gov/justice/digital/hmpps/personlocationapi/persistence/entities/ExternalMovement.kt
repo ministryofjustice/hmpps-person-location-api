@@ -125,6 +125,11 @@ final class ExternalMovement(
     appliedActions = listOf()
   }
 
+  @Transient
+  val legacyIds: Pair<Long, Int>? = legacyId?.split("_")?.takeIf { it.size == 2 }?.let {
+    Pair(it[0].toLong(), it[1].toInt())
+  }
+
   fun applySeries(series: CustodialSeries) = apply {
     this.series = series
   }

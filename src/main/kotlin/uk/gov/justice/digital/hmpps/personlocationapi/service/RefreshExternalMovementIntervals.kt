@@ -34,7 +34,8 @@ class RefreshExternalMovementIntervals(
   private val journeyRepository: ExternalJourneyRepository,
 ) {
   fun execute(event: RefreshPersonMovementIntervals): Unit = with(event) {
-    val allMovements = movementRepository.findByPersonIdentifier(personIdentifier).sortedBy { it.occurredAt }
+    val allMovements = movementRepository.findByPersonIdentifier(personIdentifier)
+      .sortedWith(compareBy({ it.occurredAt }, { it.legacyIds?.first }, { it.legacyIds?.second }))
     if (allMovements.isEmpty()) {
       deleteAllProjectionsFrom(personIdentifier)
       return

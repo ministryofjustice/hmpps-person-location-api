@@ -11,7 +11,9 @@ import uk.gov.justice.digital.hmpps.personlocationapi.exception.ConflictExceptio
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeriesRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.getSeries
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.DataSource
+import uk.gov.justice.digital.hmpps.personlocationapi.sync.ExternalJourney.JourneyType.RELEASE
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.ReferenceId
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.SyncExternalMovementRequest
 import java.util.UUID
@@ -44,6 +46,10 @@ class ExternalMovementSync(
 
     val move = original?.updateFrom(series, movement)
       ?: movementRepository.save(movement.asEntity(series))
+
+    if (movement.journey.type == RELEASE && movement.reason is CodedReason && !movement.reason.isAbscondedOrEscaped()) {
+      series.applySeries(false, series.openedAt, movement.occurredAt)
+    }
 
     aep.publishEvent(
       RefreshPersonMovementIntervals(

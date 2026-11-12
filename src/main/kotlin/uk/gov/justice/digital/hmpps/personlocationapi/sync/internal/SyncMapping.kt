@@ -74,31 +74,19 @@ fun SeriesEntity.toSyncModel() = CustodialSeries(
   notes,
 )
 
-fun MovementEntity.toSyncModel(): ExternalMovement {
-  val legacyIdParts = syncIdsFromLegacyId()
-  return ExternalMovement(
-    id,
-    series.id,
-    legacyIdParts?.first,
-    legacyIdParts?.second,
-    when (movementType) {
-      ARRIVAL -> MovementType.ARRIVAL
-      DEPARTURE -> MovementType.DEPARTURE
-    },
-    reason,
-    occurredAt,
-    origin,
-    destination,
-    notes,
-    ExternalJourney(JourneyType.valueOf(journeyType.name), scheduleReference),
-  )
-}
-
-fun MovementEntity.syncIdsFromLegacyId(): Pair<Long, Int>? {
-  val parts = legacyId?.split("_")
-  return if (parts?.size != 2) {
-    null
-  } else {
-    parts[0].toLong() to parts[1].toInt()
-  }
-}
+fun MovementEntity.toSyncModel(): ExternalMovement = ExternalMovement(
+  id,
+  series.id,
+  legacyIds?.first,
+  legacyIds?.second,
+  when (movementType) {
+    ARRIVAL -> MovementType.ARRIVAL
+    DEPARTURE -> MovementType.DEPARTURE
+  },
+  reason,
+  occurredAt,
+  origin,
+  destination,
+  notes,
+  ExternalJourney(JourneyType.valueOf(journeyType.name), scheduleReference),
+)

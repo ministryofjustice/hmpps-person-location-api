@@ -5,13 +5,14 @@ import uk.gov.justice.digital.hmpps.personlocationapi.model.episode.PeriodOfCust
 import uk.gov.justice.digital.hmpps.personlocationapi.model.episode.PeriodsOfCustody
 import uk.gov.justice.digital.hmpps.personlocationapi.model.episode.asPeriodOfCustody
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialEpisodeRepository
+import java.time.LocalDateTime
 
 @Service
 class RetrieveEpisodes(
   private val episodeRepository: CustodialEpisodeRepository,
 ) {
   fun periodsOfCustodyFor(personIdentifier: String): PeriodsOfCustody {
-    val episodes = episodeRepository.findAllByPersonIdentifier(personIdentifier).sortedByDescending { it.commencedAt }
+    val episodes = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).sortedByDescending { it.commencedAt }
     val pocs = episodes.indices.map { index -> episodes[index].asPeriodOfCustody(episodes.getOrNull(index + 1)) }
     return PeriodsOfCustody(pocs)
   }
@@ -19,5 +20,9 @@ class RetrieveEpisodes(
   fun latestPeriodFor(personIdentifier: String): PeriodOfCustody? {
     val episodes = episodeRepository.findMostRecentFor(personIdentifier).sortedByDescending { it.commencedAt }
     return episodes.firstOrNull()?.asPeriodOfCustody(episodes.lastOrNull())
+  }
+
+  fun periodAt(personIdentifier: String, dateTime: LocalDateTime): PeriodOfCustody? {
+    TODO()
   }
 }

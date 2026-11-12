@@ -3,7 +3,6 @@ package uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
-import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import jakarta.persistence.Version
 import jakarta.validation.constraints.Size
@@ -13,9 +12,8 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
-import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.TargetEpisode
 import java.time.LocalDateTime
-import java.util.Collections
 import java.util.UUID
 
 @Entity
@@ -55,57 +53,28 @@ final class CustodialEpisode(
   var concludedAt: LocalDateTime? = concludedAt
     private set
 
-  internal fun updateStatusFrom(movement: ExternalMovement) = apply {
-    val reason = movement.reason as CodedReason
-    status = when {
-      reason.isAbscondedOrEscaped() -> Status.UAL
-      reason.isDeceased() -> Status.DECEASED
-      else -> Status.COMPLETED
-    }
-    concludedAt = if (status == Status.COMPLETED || status == Status.DECEASED) {
-      movement.occurredAt
-    } else {
-      null
-    }
+  fun matchTarget(target: TargetEpisode) {
+    commencedAt = target.commencedAt
+    concludedAt = target.concludedAt
+    status = target.status
   }
 
-  internal fun updateStatusFrom(stay: PrisonStay) = apply {
-    if (stay.status != PrisonStay.Status.RELEASED) return@apply
-    val lastMovement = stay.movements().last { it.journeyType == ExternalJourney.Type.RELEASE }
-    updateStatusFrom(lastMovement)
-  }
-
-  @OneToMany(mappedBy = "episode")
-  private var stays: MutableList<PrisonStay> = mutableListOf()
-
-  fun stays(): List<PrisonStay> = Collections.unmodifiableList(stays.sortedBy { it.arrivedAt })
-
-  fun resetStays(after: LocalDateTime?) = apply {
-    stays.removeIf { after == null || !it.arrivedAt.isBefore(after) }
-    stays.maxByOrNull { it.arrivedAt }?.also { updateStatusFrom(it) }
-  }
-
-  fun activeAfter(dateTime: LocalDateTime): Boolean = !commencedAt.isAfter(dateTime) && concludedAt?.isAfter(dateTime) != false
-
-  fun applyStay(stay: PrisonStay) = apply {
-    if (stays.isEmpty()) {
-      commencedAt = stay.arrivedAt
-      concludedAt = null
-      status = when (stay.status) {
-        PrisonStay.Status.RESIDENT, PrisonStay.Status.TRANSFERRED_OUT -> Status.ACTIVE
-        PrisonStay.Status.IN_TRANSIT_EXTERNAL -> Status.TEMPORARY_ABSENCE
-        PrisonStay.Status.RELEASED -> Status.COMPLETED
-      }
-      updateStatusFrom(stay)
-    }
-    stays.add(stay.applyEpisode(this))
-  }
-
-  enum class Status { ACTIVE, TEMPORARY_ABSENCE, COMPLETED, UAL, DECEASED, CANCELLED }
+  enum class Status { ACTIVE, TEMPORARY_ABSENCE, COMPLETED, UNLAWFULLY_AT_LARGE, DECEASED }
 }
 
 interface CustodialEpisodeRepository : JpaRepository<CustodialEpisode, UUID> {
-  fun findAllByPersonIdentifier(personIdentifier: String): MutableList<CustodialEpisode>
+  fun findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier: String): MutableList<CustodialEpisode>
+  fun deleteAllByPersonIdentifier(personIdentifier: String)
+
+  @Query(
+    """
+    select e from CustodialEpisode e
+    where e.personIdentifier = :personIdentifier
+      and (e.concludedAt is null or e.concludedAt >= :cutoff)
+    order by e.commencedAt asc
+    """,
+  )
+  fun findActiveOrAfterCutoff(personIdentifier: String, cutoff: LocalDateTime): List<CustodialEpisode>
 
   @Query(
     """
@@ -117,3 +86,7 @@ interface CustodialEpisodeRepository : JpaRepository<CustodialEpisode, UUID> {
   )
   fun findMostRecentFor(personIdentifier: String): List<CustodialEpisode>
 }
+
+fun CustodialEpisodeRepository.findActiveOrAfter(personIdentifier: String, cutoff: LocalDateTime?) = cutoff?.let {
+  findActiveOrAfterCutoff(personIdentifier, it)
+} ?: findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).reversed()

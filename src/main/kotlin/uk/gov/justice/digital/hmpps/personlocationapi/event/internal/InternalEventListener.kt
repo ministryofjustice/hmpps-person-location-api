@@ -2,6 +2,7 @@ package uk.gov.justice.digital.hmpps.personlocationapi.event.internal
 
 import io.awspring.cloud.sqs.annotation.SqsListener
 import io.sentry.Sentry
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.readValue
@@ -11,6 +12,8 @@ import uk.gov.justice.digital.hmpps.personlocationapi.event.Notification
 import uk.gov.justice.digital.hmpps.personlocationapi.service.RefreshAllIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.service.RefreshExternalMovementIntervals
 
+// allows disabling for migration
+@ConditionalOnProperty(name = ["internal.event.process"], havingValue = "true", matchIfMissing = false)
 @Component
 class InternalEventListener(
   private val jsonMapper: JsonMapper,

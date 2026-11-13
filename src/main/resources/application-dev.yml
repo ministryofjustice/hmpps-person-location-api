@@ -2,11 +2,11 @@ integration:
   hmpps-auth:
     url: "https://sign-in-dev.hmpps.service.justice.gov.uk/auth"
 
+service:
+  api-base-url: "https://person-location-api-dev.hmpps.service.justice.gov.uk"
+
 springdoc:
   api-docs:
     enabled: true
   swagger-ui:
     enabled: true
-
-service:
-  api-base-url: "https://person-location-api-dev.hmpps.service.justice.gov.uk"

@@ -21,7 +21,9 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.reactive.server.WebTestClient
 import org.springframework.test.web.reactive.server.expectBody
 import org.springframework.transaction.support.TransactionTemplate
+import tools.jackson.databind.json.JsonMapper
 import uk.gov.justice.digital.hmpps.personlocationapi.context.RequestContext
+import uk.gov.justice.digital.hmpps.personlocationapi.event.domain.DomainEvent
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.TestConfig
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.container.LocalStackContainer
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.container.LocalStackContainer.setMiniStackProperties
@@ -33,7 +35,16 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.HmppsDomainEvent
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.publication
 import uk.gov.justice.hmpps.kotlin.common.ErrorResponse
+import uk.gov.justice.hmpps.sqs.HmppsQueue
+import uk.gov.justice.hmpps.sqs.HmppsQueueService
+import uk.gov.justice.hmpps.sqs.MissingQueueException
+import uk.gov.justice.hmpps.sqs.MissingTopicException
+import uk.gov.justice.hmpps.sqs.countAllMessagesOnQueue
+import uk.gov.justice.hmpps.sqs.publish
 import uk.gov.justice.hmpps.test.kotlin.auth.JwtAuthorisationHelper
+import java.time.Duration
+import java.time.Instant.now
+import java.util.concurrent.TimeUnit
 import kotlin.collections.map
 import kotlin.jvm.java
 
@@ -55,6 +66,33 @@ abstract class IntegrationTest {
 
   @Autowired
   protected lateinit var jwtAuthHelper: JwtAuthorisationHelper
+
+  @Autowired
+  protected lateinit var jsonMapper: JsonMapper
+
+  @Autowired
+  protected lateinit var hmppsQueueService: HmppsQueueService
+
+  protected val domainEventsTopic by lazy {
+    hmppsQueueService.findByTopicId("hmppseventtopic")
+      ?: throw MissingTopicException("hmppseventtopic not found")
+  }
+
+  protected fun sendDomainEvent(event: DomainEvent<*>) {
+    domainEventsTopic.publish(event.eventType, jsonMapper.writeValueAsString(event))
+  }
+
+  protected val domainEventsQueue by lazy {
+    hmppsQueueService.findByQueueId("hmppsdomaineventsqueue")
+      ?: throw MissingQueueException("hmppsdomaineventsqueue not found")
+  }
+
+  protected val internalEventsQueue by lazy {
+    hmppsQueueService.findByQueueId("internalevents")
+      ?: throw MissingQueueException("internalevents not found")
+  }
+
+  protected fun HmppsQueue.isEmpty() = sqsClient.countAllMessagesOnQueue(queueUrl = queueUrl).get() == 0
 
   protected fun verifyAudit(
     entity: Identifiable,
@@ -122,7 +160,23 @@ abstract class IntegrationTest {
     }
   }
 
-  internal fun setAuthorisation(
+  protected fun waitUntil(
+    pollingInterval: Duration = Duration.ofMillis(100),
+    maxInterval: Duration = Duration.ofSeconds(1),
+    predicate: () -> Boolean,
+  ) {
+    val end = now().plus(maxInterval)
+    var result: Boolean
+    do {
+      TimeUnit.MILLISECONDS.sleep(pollingInterval.toMillis())
+      result = predicate()
+    } while (!result && now().isBefore(end))
+    if (!result) {
+      throw IllegalStateException("Predicate not met before timeout")
+    }
+  }
+
+  protected fun setAuthorisation(
     username: String? = "AUTH_ADM",
     roles: List<String> = listOf(),
     scopes: List<String> = listOf("read"),

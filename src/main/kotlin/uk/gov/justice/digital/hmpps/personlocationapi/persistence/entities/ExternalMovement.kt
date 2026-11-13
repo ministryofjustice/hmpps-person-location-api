@@ -134,6 +134,10 @@ final class ExternalMovement(
     this.series = series
   }
 
+  fun applyPerson(personIdentifier: String) = apply {
+    this.personIdentifier = personIdentifier
+  }
+
   fun applyType(action: ApplyType) = apply {
     if (action changes this) {
       movementType = action.type

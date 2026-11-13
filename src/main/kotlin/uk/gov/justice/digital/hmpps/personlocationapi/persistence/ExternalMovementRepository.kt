@@ -32,9 +32,14 @@ interface ExternalMovementRepository : JpaRepository<ExternalMovement, UUID> {
 
   fun countBySeriesId(seriesId: UUID): Int
 
+  fun findBySeriesId(seriesId: UUID): List<ExternalMovement>
+
   fun findByLegacyId(legacyId: String): ExternalMovement?
 
+  @Query("select em from ExternalMovement em where em.personIdentifier = :personIdentifier")
   @QueryHints(QueryHint(name = HibernateHints.HINT_READ_ONLY, value = "true"))
+  fun findByPersonIdentifierReadOnly(personIdentifier: String): List<ExternalMovement>
+
   fun findByPersonIdentifier(personIdentifier: String): List<ExternalMovement>
 
   @Query(

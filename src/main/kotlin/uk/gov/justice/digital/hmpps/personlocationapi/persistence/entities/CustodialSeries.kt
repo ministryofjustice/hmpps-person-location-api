@@ -128,7 +128,6 @@ interface CustodialSeriesRepository : JpaRepository<CustodialSeries, UUID> {
 
   fun findByLegacyId(legacyId: Long): CustodialSeries?
 
-  @QueryHints(QueryHint(name = HibernateHints.HINT_READ_ONLY, value = "true"))
   fun findByPersonIdentifier(personIdentifier: String): List<CustodialSeries>
 
   @QueryHints(QueryHint(name = HibernateHints.HINT_READ_ONLY, value = "true"))

@@ -26,7 +26,12 @@ data class ReconciliationPrisonerStatus(
   val inCustody: Boolean,
   val prisonCode: String?,
   val temporarilyAbsent: Boolean,
+  val transferring: Boolean,
 ) {
   val expectedLegacyInOut: String = if (inCustody && !temporarilyAbsent) "IN" else "OUT"
-  val expectedLegacyActive: String = if (inCustody) "ACTIVE" else "INACTIVE"
+  val expectedLegacyActive: String = when {
+    transferring -> "TRN"
+    inCustody -> "IN"
+    else -> "OUT"
+  }
 }

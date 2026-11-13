@@ -73,6 +73,10 @@ final class MovementInterval(
   var destination: Location? = destination
     private set
 
+  fun applyPerson(personIdentifier: String) {
+    this.personIdentifier = personIdentifier
+  }
+
   fun matchTarget(target: TargetInterval) {
     validFrom = target.validFrom
     validTo = target.validTo

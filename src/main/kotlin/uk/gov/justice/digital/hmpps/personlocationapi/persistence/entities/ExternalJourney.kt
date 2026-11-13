@@ -80,6 +80,10 @@ final class ExternalJourney(
   var externalReference: ExternalReference? = externalReference
     private set
 
+  fun applyPerson(personIdentifier: String) {
+    this.personIdentifier = personIdentifier
+  }
+
   fun matchTarget(target: TargetJourney) {
     type = target.journeyType
     status = if (concludedAt == null) Status.IN_TRANSIT else Status.COMPLETED

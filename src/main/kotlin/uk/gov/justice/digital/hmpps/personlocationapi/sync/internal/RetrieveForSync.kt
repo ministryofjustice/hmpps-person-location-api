@@ -10,6 +10,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.Custo
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalJourney
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalJourneyRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStay
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStayRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.getSeries
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.getMovement
@@ -32,14 +33,15 @@ class RetrieveForSync(
   fun movement(id: UUID) = movementRepository.getMovement(id).toSyncModel()
   fun all(personIdentifier: String): ReconciliationResponse {
     val series = seriesRepository.findByPersonIdentifier(personIdentifier)
-    val movements = movementRepository.findByPersonIdentifier(personIdentifier).groupBy { it.series.id }
+    val movements = movementRepository.findByPersonIdentifierReadOnly(personIdentifier).groupBy { it.series.id }
     val latestPeriod = episodeRepository.findMostRecentFor(personIdentifier).firstOrNull()
     val latestStay = stayRepository.findMostRecentFor(personIdentifier)
     val latestJourney = journeyRepository.findMostRecentFor(personIdentifier)
     val status = ReconciliationPrisonerStatus(
       latestPeriod?.status == CustodialEpisode.Status.ACTIVE,
-      latestStay?.prisonCode,
+      latestStay?.takeIf { it.status in listOf(PrisonStay.Status.RESIDENT, PrisonStay.Status.IN_TRANSIT_EXTERNAL) }?.prisonCode,
       latestJourney?.status == ExternalJourney.Status.IN_TRANSIT,
+      latestStay?.status == PrisonStay.Status.TRANSFERRED_OUT || (latestJourney?.type == ExternalJourney.Type.TRANSFER && latestJourney.status == ExternalJourney.Status.IN_TRANSIT),
     )
     return series.map { it.forReconciliation { seriesId -> movements[seriesId] ?: emptyList() } }.asResponse(status)
   }

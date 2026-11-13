@@ -1,5 +1,7 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.event.domain
 
+import java.time.LocalDateTime
+
 data class PrisonerUpdatedInformation(
   val nomsNumber: String,
   val categoriesChanged: Set<String>,
@@ -60,5 +62,27 @@ data class PrisonerReceived(
   companion object {
     const val EVENT_TYPE: String = "prison-offender-search.prisoner.received"
     const val DESCRIPTION: String = "A prisoner has been received into prison"
+  }
+}
+
+data class BookingMovedInformation(
+  val bookingId: Long,
+  val movedFromNomsNumber: String,
+  val movedToNomsNumber: String,
+  val bookingStartDateTime: LocalDateTime,
+  val bookingEndDateTime: LocalDateTime?,
+) : AdditionalInformation
+
+data class BookingMoved(
+  override val additionalInformation: BookingMovedInformation,
+  override val personReference: PersonReference,
+) : DomainEvent<BookingMovedInformation> {
+  override val eventType: String = EVENT_TYPE
+  override val description: String = DESCRIPTION
+  override val detailUrl: String? = null
+
+  companion object {
+    const val EVENT_TYPE: String = "prison-offender-events.prisoner.booking.moved"
+    const val DESCRIPTION: String = "A NOMIS booking has moved between prisoners"
   }
 }

@@ -17,14 +17,16 @@ class PrisonerMergedHandler(
 ) {
   fun handle(de: PrisonerMerged) {
     val pmi = de.additionalInformation
-    val updates = transactionTemplate.execute {
-      movementRepository.findByPersonIdentifier(pmi.removedNomsNumber)
+    transactionTemplate.execute {
+      val series = seriesRepository.findByPersonIdentifier(pmi.removedNomsNumber)
         .onEach { it.applyPerson(pmi.nomsNumber) }
-      seriesRepository.findByPersonIdentifier(pmi.removedNomsNumber)
+      val movements = movementRepository.findByPersonIdentifier(pmi.removedNomsNumber)
         .onEach { it.applyPerson(pmi.nomsNumber) }
-        .takeIf { it.isNotEmpty() }
-        ?.let { listOf(pmi.removedNomsNumber, pmi.nomsNumber).map { RefreshPersonMovementIntervals(it) } } ?: emptyList()
-    }
-    iee.publishInternalEvents(updates)
+      return@execute if (series.isNotEmpty() || movements.isNotEmpty()) {
+        listOf(pmi.removedNomsNumber, pmi.nomsNumber).map { RefreshPersonMovementIntervals(it) }
+      } else {
+        null
+      }
+    }?.also { iee.publishInternalEvents(it) }
   }
 }

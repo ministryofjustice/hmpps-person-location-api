@@ -1,4 +1,4 @@
-package uk.gov.justice.digital.hmpps.personlocationapi.integration.merge
+package uk.gov.justice.digital.hmpps.personlocationapi.integration.legacyevents
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test

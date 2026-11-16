@@ -123,5 +123,6 @@ service:
   domain-events:
     poll-interval: PT0.1s
     batch-size: 10
-
-internal.event.process: true
+  projection:
+    movement-intervals:
+      ignore: false

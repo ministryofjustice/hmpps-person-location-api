@@ -7,6 +7,9 @@ import java.time.Duration
 data class ServiceConfig(
   val domainEvents: DomainEventConfig,
   val apiBaseUrl: String,
+  val projection: ProjectionConfig,
 ) {
   data class DomainEventConfig(val pollInterval: Duration, val batchSize: Int)
+  data class ProjectionConfig(val movementIntervals: MovementIntervalConfig)
+  data class MovementIntervalConfig(val ignore: Boolean = false)
 }

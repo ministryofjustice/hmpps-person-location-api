@@ -4,6 +4,3 @@ integration:
 
 service:
   api-base-url: "https://person-location-api.hmpps.service.justice.gov.uk"
-  projection:
-    movement-intervals:
-      ignore: true

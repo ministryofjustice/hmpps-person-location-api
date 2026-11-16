@@ -2,7 +2,6 @@ package uk.gov.justice.digital.hmpps.personlocationapi.service
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import uk.gov.justice.digital.hmpps.personlocationapi.config.ServiceConfig
 import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.RefreshPersonMovementIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.TargetEpisode
@@ -28,7 +27,6 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.projectTimelin
 @Transactional
 @Service
 class RefreshExternalMovementIntervals(
-  private val serviceConfig: ServiceConfig,
   private val movementRepository: ExternalMovementRepository,
   private val intervalRepository: MovementIntervalRepository,
   private val stayRepository: PrisonStayRepository,
@@ -78,9 +76,7 @@ class RefreshExternalMovementIntervals(
       effectiveRefreshFrom == null || it.concludedAt == null || !it.concludedAt!!.isBefore(effectiveRefreshFrom)
     }
 
-    if (!serviceConfig.projection.movementIntervals.ignore) {
-      mergeIntervals(personIdentifier, existingIntervals, targetIntervals)
-    }
+    mergeIntervals(personIdentifier, existingIntervals, targetIntervals)
     mergeStays(personIdentifier, existingStays, activeTargetStays)
     mergeEpisodes(personIdentifier, existingEpisodes, activeTargetEpisodes)
     mergeJourneys(personIdentifier, existingJourneys, activeTargetJourneys)

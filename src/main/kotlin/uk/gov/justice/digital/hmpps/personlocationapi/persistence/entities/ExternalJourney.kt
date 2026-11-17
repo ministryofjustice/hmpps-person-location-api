@@ -86,9 +86,9 @@ final class ExternalJourney(
 
   fun matchTarget(target: TargetJourney) {
     type = target.journeyType
-    status = if (concludedAt == null) Status.IN_TRANSIT else Status.COMPLETED
     commencedAt = target.commencedAt
     concludedAt = target.concludedAt
+    status = if (target.concludedAt == null) Status.IN_TRANSIT else Status.COMPLETED
     origin = target.origin.code
     destination = (target.destination?.takeIf { it is Prison } as? Prison)?.code
   }

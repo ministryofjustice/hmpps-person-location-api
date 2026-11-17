@@ -86,9 +86,9 @@ final class CustodialSeries(
     this.personIdentifier = personIdentifier
   }
 
-  fun applySeries(isActive: Boolean, openedAt: LocalDateTime, closedAt: LocalDateTime?) = apply {
+  fun applySeries(isActive: Boolean, status: Status, openedAt: LocalDateTime, closedAt: LocalDateTime?) = apply {
     this.isActive = isActive
-    status = if (closedAt == null) Status.OPEN else Status.CLOSED
+    this.status = status
     this.openedAt = openedAt
     this.closedAt = closedAt
   }

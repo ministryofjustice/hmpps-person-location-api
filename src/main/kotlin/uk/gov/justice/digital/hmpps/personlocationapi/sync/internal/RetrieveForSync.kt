@@ -38,7 +38,7 @@ class RetrieveForSync(
     val latestStay = stayRepository.findMostRecentFor(personIdentifier)
     val latestJourney = journeyRepository.findMostRecentFor(personIdentifier)
     val status = ReconciliationPrisonerStatus(
-      latestPeriod?.status == CustodialEpisode.Status.ACTIVE,
+      latestPeriod?.status in listOf(CustodialEpisode.Status.ACTIVE, CustodialEpisode.Status.TEMPORARY_ABSENCE),
       latestStay?.takeIf { it.status in listOf(PrisonStay.Status.RESIDENT, PrisonStay.Status.IN_TRANSIT_EXTERNAL) }?.prisonCode,
       latestJourney?.status == ExternalJourney.Status.IN_TRANSIT,
       latestStay?.status == PrisonStay.Status.TRANSFERRED_OUT || (latestJourney?.type == ExternalJourney.Type.TRANSFER && latestJourney.status == ExternalJourney.Status.IN_TRANSIT),

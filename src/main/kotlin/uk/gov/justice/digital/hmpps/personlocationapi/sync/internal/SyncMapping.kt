@@ -30,7 +30,15 @@ fun CustodialSeries.asEntity(personIdentifier: String) = SeriesEntity(
 
 fun SeriesEntity.updateFrom(personIdentifier: String, request: CustodialSeries) = apply {
   applyPerson(personIdentifier)
-  applySeries(request.isActive, request.openedAt, request.closedAt)
+  applySeries(
+    request.isActive,
+    when (request.status) {
+      CustodialSeries.Status.OPEN -> SeriesEntity.Status.OPEN
+      CustodialSeries.Status.CLOSED -> SeriesEntity.Status.CLOSED
+    },
+    request.openedAt,
+    request.closedAt,
+  )
   applyNotes(request.notes)
   applyLegacyIdentifiers(request.legacyId, request.legacyBookingReference)
 }

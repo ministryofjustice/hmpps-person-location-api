@@ -41,7 +41,8 @@ internal fun List<ExternalMovement>.deduplicateAndPrioritize(): List<Deduplicate
       journeyType = duplicates.maxBy { it.journeyType.ordinal }.journeyType,
       origin = duplicates.map { it.origin }.minByOrNull { it.priority() },
       destination = duplicates.map { it.destination }.minByOrNull { it.priority() },
-      reason = duplicates.map { it.reason }.distinct().let { if (it.size > 1) HierarchicalReason(it.filterIsInstance<CodedReason>()) else it.single() },
+      reason = duplicates.map { it.reason }.distinct()
+        .let { if (it.size > 1) HierarchicalReason(it.filterIsInstance<CodedReason>()) else it.single() },
       externalReference = duplicates.firstOrNull { it.scheduleReference != null }?.scheduleReference,
     )
   }.sortedBy { it.occurredAt }
@@ -78,7 +79,7 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
   for ((occurredAt, movementType, journeyType, origin, destination, reason, externalReference) in this) {
     when (movementType) {
       ExternalMovement.Type.DEPARTURE -> {
-        if (origin is Prison) {
+        if (origin is Prison && reason.isNotForMerge()) {
           if (journeyType == ExternalJourney.Type.RELEASE) {
             currentStay?.apply {
               departedAt = occurredAt
@@ -94,7 +95,8 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
                 status = CustodialEpisode.Status.UNLAWFULLY_AT_LARGE
               } else {
                 concludedAt = occurredAt
-                status = if (reason is CodedReason && reason.isDeceased()) CustodialEpisode.Status.DECEASED else CustodialEpisode.Status.COMPLETED
+                status =
+                  if (reason is CodedReason && reason.isDeceased()) CustodialEpisode.Status.DECEASED else CustodialEpisode.Status.COMPLETED
                 if (commencedAt.isEqual(concludedAt)) {
                   episodes.remove(this)
                 }
@@ -171,3 +173,5 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
 
   return ProjectedTimeline(episodes, stays, journeys)
 }
+
+private fun MovementReason.isNotForMerge() = (this !is CodedReason || !this.isForMerge())

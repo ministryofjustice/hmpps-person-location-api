@@ -849,4 +849,73 @@ class RefreshIntervalsIntTest(
     assertThat(episode.concludedAt).isEqualTo(death.occurredAt)
     assertThat(episode.status).isEqualTo(CustodialEpisode.Status.DECEASED)
   }
+
+  @Test
+  fun `can handle release for merge`() {
+    val personIdentifier = personIdentifier()
+    val start = LocalDate.now().atTime(10, 0).minusWeeks(14)
+    val prisonOne = prison()
+    val seriesOne = givenSeries(
+      custodialSeries(
+        personIdentifier,
+        openedAt = start,
+        closedAt = start.plusDays(7).withHour(0).withMinute(0),
+        status = CustodialSeries.Status.CLOSED,
+        isActive = false,
+      ),
+    )
+    val admissionOne = givenMovement(
+      externalMovement(
+        seriesOne,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = start,
+      ),
+    )
+    val relOne = givenMovement(
+      externalMovement(
+        seriesOne,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        origin = prisonOne,
+        occurredAt = start.plusDays(7),
+        reason = CodedReason("MRG", "Administrative release due to merge"),
+      ),
+    )
+    val seriesTwo = givenSeries(
+      custodialSeries(
+        personIdentifier,
+        openedAt = relOne.occurredAt.minusSeconds(30),
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = relOne.occurredAt.minusSeconds(30),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
+    assertThat(stays).hasSize(1)
+    val stay = stays.single()
+    assertThat(stay.arrivedAt).isEqualTo(admissionOne.occurredAt)
+    assertThat(stay.departedAt).isNull()
+    assertThat(stay.status).isEqualTo(PrisonStay.Status.RESIDENT)
+
+    val episodes = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).reversed()
+    assertThat(episodes).hasSize(1)
+    val episodeOne = episodes.single()
+    assertThat(episodeOne.commencedAt).isEqualTo(stay.arrivedAt)
+    assertThat(episodeOne.concludedAt).isNull()
+    assertThat(episodeOne.status).isEqualTo(CustodialEpisode.Status.ACTIVE)
+
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
+    assertThat(journeys).isEmpty()
+  }
 }

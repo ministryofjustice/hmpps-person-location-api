@@ -22,7 +22,5 @@ class RetrieveEpisodes(
     return episodes.firstOrNull()?.asPeriodOfCustody(episodes.lastOrNull())
   }
 
-  fun periodAt(personIdentifier: String, dateTime: LocalDateTime): PeriodOfCustody? {
-    TODO()
-  }
+  fun periodForAt(personIdentifier: String, dateTime: LocalDateTime): PeriodOfCustody? = episodeRepository.findAt(personIdentifier, dateTime)?.asPeriodOfCustody()
 }

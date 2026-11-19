@@ -31,12 +31,12 @@ class EpisodeController(private val retrieve: RetrieveEpisodes) {
     value = [
       ApiResponse(
         responseCode = "401",
-        description = "Unauthorised, requires a valid Oauth2 token",
+        description = "Unauthorised, requires a valid Oauth2 token.",
         content = [Content(schema = Schema(implementation = ErrorResponse::class))],
       ),
       ApiResponse(
         responseCode = "403",
-        description = "Forbidden, requires an appropriate role",
+        description = "Forbidden, requires an appropriate role.",
         content = [Content(schema = Schema(implementation = ErrorResponse::class))],
       ),
       ApiResponse(
@@ -54,17 +54,17 @@ class EpisodeController(private val retrieve: RetrieveEpisodes) {
     value = [
       ApiResponse(
         responseCode = "401",
-        description = "Unauthorised, requires a valid Oauth2 token",
+        description = "Unauthorised, requires a valid Oauth2 token.",
         content = [Content(schema = Schema(implementation = ErrorResponse::class))],
       ),
       ApiResponse(
         responseCode = "403",
-        description = "Forbidden, requires an appropriate role",
+        description = "Forbidden, requires an appropriate role.",
         content = [Content(schema = Schema(implementation = ErrorResponse::class))],
       ),
       ApiResponse(
         responseCode = "404",
-        description = "No period of custody exists for the provided identifier",
+        description = "No period of custody exists for the provided identifier.",
         content = [Content(schema = Schema(implementation = ErrorResponse::class))],
       ),
       ApiResponse(
@@ -83,17 +83,17 @@ class EpisodeController(private val retrieve: RetrieveEpisodes) {
     value = [
       ApiResponse(
         responseCode = "401",
-        description = "Unauthorised, requires a valid Oauth2 token",
+        description = "Unauthorised, requires a valid Oauth2 token.",
         content = [Content(schema = Schema(implementation = ErrorResponse::class))],
       ),
       ApiResponse(
         responseCode = "403",
-        description = "Forbidden, requires an appropriate role",
+        description = "Forbidden, requires an appropriate role.",
         content = [Content(schema = Schema(implementation = ErrorResponse::class))],
       ),
       ApiResponse(
         responseCode = "404",
-        description = "No period of custody exists for the provided identifier at the given date and time",
+        description = "No period of custody exists for the provided identifier at the given date and time.",
         content = [Content(schema = Schema(implementation = ErrorResponse::class))],
       ),
       ApiResponse(
@@ -104,5 +104,5 @@ class EpisodeController(private val retrieve: RetrieveEpisodes) {
     ],
   )
   @GetMapping("/periods-of-custody/at")
-  fun periodAt(@PathVariable personIdentifier: String, @RequestParam anchorDateTime: LocalDateTime): PeriodOfCustody = retrieve.periodAt(personIdentifier, anchorDateTime) ?: throw NotFoundException("No matching period of custody found for the provided identifier.")
+  fun periodAt(@PathVariable personIdentifier: String, @RequestParam anchorDateTime: LocalDateTime): PeriodOfCustody = retrieve.periodForAt(personIdentifier, anchorDateTime) ?: throw NotFoundException("No matching period of custody found for the provided identifier.")
 }

@@ -3,6 +3,7 @@ package uk.gov.justice.digital.hmpps.personlocationapi.model.episode
 import io.swagger.v3.oas.annotations.media.Schema
 import uk.gov.justice.digital.hmpps.personlocationapi.model.CodedDescription
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialEpisode
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.EpisodeAt
 import java.time.LocalDateTime
 
 @Schema(description = "Period of custody")
@@ -27,3 +28,5 @@ data class PeriodsOfCustody(val periodsOfCustody: List<PeriodOfCustody>)
 private fun CustodialEpisode.Status.asCodedDescription(): CodedDescription = CodedDescription(name, name.first().uppercase() + name.substring(1).lowercase().replace("_", " "))
 
 fun CustodialEpisode.asPeriodOfCustody(previous: CustodialEpisode?): PeriodOfCustody = PeriodOfCustody(commencedAt, concludedAt, status.asCodedDescription(), previous?.concludedAt?.let(::PreviousPeriod))
+
+fun EpisodeAt.asPeriodOfCustody() = PeriodOfCustody(commencedAt, concludedAt, episodeStatus().asCodedDescription(), previousConcludedAt?.let(::PreviousPeriod))

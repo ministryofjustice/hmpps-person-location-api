@@ -36,11 +36,15 @@ data class CodedReason(val code: String, override val description: String) : Mov
   @JsonIgnore
   fun isDeceased(): Boolean = code == DECEASED
 
+  @JsonIgnore
+  fun isForMerge(): Boolean = code == MERGED
+
   companion object {
     private const val DECEASED = "DEC"
     private const val UNLAWFULLY_AT_LARGE = "UAL"
     private const val ESCAPED = "ESC"
     private const val ABSCOND_END_OF_LICENCE = "UAL_ECL"
+    private const val MERGED = "MRG"
     private val ABSCONDED_CODES = listOf(UNLAWFULLY_AT_LARGE, ESCAPED, ABSCOND_END_OF_LICENCE)
   }
 }

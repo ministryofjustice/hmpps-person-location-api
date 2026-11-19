@@ -20,7 +20,7 @@ data class TimelineStay(
   val prison: TimelinePrison,
   @Schema(description = "Information about the arrival.")
   val arrival: TimeLineActivity,
-  @Schema(description = "Information about the departure.")
+  @Schema(description = "Information about the departure. Null if this is where the person is currently in custody.")
   val departure: TimeLineActivity?,
 )
 

@@ -89,8 +89,43 @@ interface CustodialEpisodeRepository : JpaRepository<CustodialEpisode, UUID> {
   """,
   )
   fun findMostRecentFor(personIdentifier: String): List<CustodialEpisode>
+
+  @Query(
+    value = """
+      select 
+        e.id AS "id",
+        e.person_identifier as "personIdentifier",
+        e.commenced_at as "commencedAt",
+        e.concluded_at as "concludedAt",
+        e.status::text as "status",
+        (
+          select prev.concluded_at
+          from custodial_episode prev
+          where prev.person_identifier = e.person_identifier
+            and prev.commenced_at < e.commenced_at
+          order by prev.commenced_at desc
+          limit 1
+        ) as "previousConcludedAt"
+      from custodial_episode e
+      where e.person_identifier = :personIdentifier
+        and e.period @> cast(:at as timestamp)
+    """,
+    nativeQuery = true,
+  )
+  fun findAt(personIdentifier: String, at: LocalDateTime): EpisodeAt?
 }
 
 fun CustodialEpisodeRepository.findActiveOrAfter(personIdentifier: String, cutoff: LocalDateTime?) = cutoff?.let {
   findActiveOrAfterCutoff(personIdentifier, it)
 } ?: findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).reversed()
+
+data class EpisodeAt(
+  val id: UUID,
+  val personIdentifier: String,
+  val commencedAt: LocalDateTime,
+  val concludedAt: LocalDateTime?,
+  val status: String,
+  val previousConcludedAt: LocalDateTime?,
+) {
+  fun episodeStatus() = CustodialEpisode.Status.valueOf(status)
+}

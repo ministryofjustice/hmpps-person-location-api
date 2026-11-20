@@ -8,6 +8,7 @@ import jakarta.persistence.Version
 import jakarta.validation.constraints.Size
 import org.hibernate.annotations.JdbcType
 import org.hibernate.dialect.type.PostgreSQLEnumJdbcType
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
@@ -96,13 +97,22 @@ interface PrisonStayRepository : JpaRepository<PrisonStay, UUID> {
 
   @Query(
     """
-    select ps.prisonCode as prisonCode, ps.arrivedAt as arrivedAt, ps.departedAt as departedAt, arr.reason as arrivedReason, dep.reason as departedReason 
-    from PrisonStay ps
-    join MovementInterval arr on ps.personIdentifier = arr.personIdentifier and ps.arrivedAt = arr.validFrom
-    left join MovementInterval dep on ps.personIdentifier = dep.personIdentifier and ps.arrivedAt = dep.validFrom
-    where ps.personIdentifier = :personIdentifier
-    order by ps.arrivedAt
+    select
+    ce.commenced_at as "episodeCommencedAt",
+    ce.concluded_at as "episodeConcludedAt",
+    ps.prison_code as "prisonCode",
+    ps.arrived_at as "arrivedAt",
+    ps.departed_at as "departedAt",
+    arr.reason as "arrivedReason",
+    dep.reason as "departedReason"
+    from prison_stay ps
+         join custodial_episode ce on ce.person_identifier = ps.person_identifier and ce.period @> ps.period
+         join movement_interval arr on arr.person_identifier = ps.person_identifier and arr.valid_from = ps.arrived_at
+         left join movement_interval dep on dep.person_identifier = ps.person_identifier and dep.valid_from = ps.departed_at
+    where ps.person_identifier = :personIdentifier
+    order by ps.arrived_at;
     """,
+    nativeQuery = true,
   )
   fun findAllByPersonIdentifierWithReasons(personIdentifier: String): List<StayWithReasons>
 }
@@ -111,10 +121,16 @@ fun PrisonStayRepository.findActiveOrAfter(personIdentifier: String, cutoff: Loc
   findActiveOrAfterCutoff(personIdentifier, it)
 } ?: findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
 
-data class StayWithReasons(
-  val prisonCode: String,
-  val arrivedAt: LocalDateTime,
-  val departedAt: LocalDateTime?,
-  val arrivedReason: MovementReason,
-  val departedReason: MovementReason?,
-)
+interface StayWithReasons {
+  val episodeCommencedAt: LocalDateTime
+  val episodeConcludedAt: LocalDateTime?
+  val prisonCode: String
+  val arrivedAt: LocalDateTime
+  val departedAt: LocalDateTime?
+
+  @get:Value("#{@jacksonJsonMapper.readValue(target.arrivedReason, T(uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.MovementReason))}")
+  val arrivedReason: MovementReason
+
+  @get:Value("#{@jacksonJsonMapper.readValue(target.departedReason, T(uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.MovementReason))}")
+  val departedReason: MovementReason?
+}

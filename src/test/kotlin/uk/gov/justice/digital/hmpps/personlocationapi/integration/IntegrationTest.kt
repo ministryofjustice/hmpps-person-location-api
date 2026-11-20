@@ -34,6 +34,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.DomainEventPub
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.HmppsDomainEvent
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.publication
+import uk.gov.justice.digital.hmpps.personlocationapi.service.RefreshExternalMovementIntervals
 import uk.gov.justice.hmpps.kotlin.common.ErrorResponse
 import uk.gov.justice.hmpps.sqs.HmppsQueue
 import uk.gov.justice.hmpps.sqs.HmppsQueueService
@@ -72,6 +73,9 @@ abstract class IntegrationTest {
 
   @Autowired
   protected lateinit var hmppsQueueService: HmppsQueueService
+
+  @Autowired
+  protected lateinit var refresh: RefreshExternalMovementIntervals
 
   protected val domainEventsTopic by lazy {
     hmppsQueueService.findByTopicId("hmppseventtopic")

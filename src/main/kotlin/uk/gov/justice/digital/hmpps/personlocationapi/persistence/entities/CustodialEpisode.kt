@@ -53,10 +53,6 @@ final class CustodialEpisode(
   var concludedAt: LocalDateTime? = concludedAt
     private set
 
-  fun applyPerson(personIdentifier: String) {
-    this.personIdentifier = personIdentifier
-  }
-
   fun matchTarget(target: TargetEpisode) {
     commencedAt = target.commencedAt
     concludedAt = target.concludedAt

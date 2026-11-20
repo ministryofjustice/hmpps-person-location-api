@@ -24,13 +24,11 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.Priso
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.SimpleLocation
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReferenceEntity
-import uk.gov.justice.digital.hmpps.personlocationapi.service.RefreshExternalMovementIntervals
 import java.time.LocalDate
 
 class RefreshIntervalsIntTest(
   @Autowired seriesOps: CustodialSeriesOperations,
   @Autowired moveOps: ExternalMovementOperations,
-  @Autowired private val refresh: RefreshExternalMovementIntervals,
   @Autowired private val stayRepository: PrisonStayRepository,
   @Autowired private val episodeRepository: CustodialEpisodeRepository,
   @Autowired private val journeyRepository: ExternalJourneyRepository,

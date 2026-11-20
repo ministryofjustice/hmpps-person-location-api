@@ -6,6 +6,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.Exter
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.MovementInterval
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.PrisonStay
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Location
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.MovementReason
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Prison
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReference
 import java.time.LocalDateTime
@@ -23,6 +24,7 @@ data class TargetInterval(
   val journeyType: ExternalJourney.Type,
   val origin: Location,
   val destination: Location?,
+  val reason: MovementReason,
 )
 
 data class TargetJourney(
@@ -55,6 +57,7 @@ internal fun TargetInterval.asEntity(personIdentifier: String) = MovementInterva
   validTo = validTo,
   origin = origin,
   destination = destination,
+  reason = reason,
 )
 
 internal fun TargetStay.asEntity(personIdentifier: String) = PrisonStay(personIdentifier, prisonCode, status, arrivedAt, departedAt)

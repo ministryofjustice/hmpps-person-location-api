@@ -16,14 +16,12 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.Custo
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalJourney
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Prison
-import uk.gov.justice.digital.hmpps.personlocationapi.service.RefreshExternalMovementIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.sync.ReconciliationResponse
 import java.time.LocalDateTime
 
 class SyncReconciliationRetrievalIntTest(
   @Autowired seriesOps: CustodialSeriesOperations,
   @Autowired moveOps: ExternalMovementOperations,
-  @Autowired private val refresh: RefreshExternalMovementIntervals,
 ) : IntegrationTest(),
   CustodialSeriesOperations by seriesOps,
   ExternalMovementOperations by moveOps {

@@ -87,6 +87,7 @@ final class MovementInterval(
     destination = target.destination
     movementType = target.movementType
     journeyType = target.journeyType
+    reason = target.reason
   }
 }
 

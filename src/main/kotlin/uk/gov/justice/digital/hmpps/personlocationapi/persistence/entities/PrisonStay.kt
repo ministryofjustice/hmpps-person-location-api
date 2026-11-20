@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Query
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.newUuid
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.TargetStay
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.MovementReason
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -75,10 +76,10 @@ interface PrisonStayRepository : JpaRepository<PrisonStay, UUID> {
 
   @Query(
     """
-    select s from PrisonStay s
-    where s.personIdentifier = :personIdentifier
-      and (s.departedAt is null or s.departedAt >= :cutoff)
-    order by s.arrivedAt asc
+    select ps from PrisonStay ps
+    where ps.personIdentifier = :personIdentifier
+      and (ps.departedAt is null or ps.departedAt >= :cutoff)
+    order by ps.arrivedAt asc
     """,
   )
   fun findActiveOrAfterCutoff(personIdentifier: String, cutoff: LocalDateTime): List<PrisonStay>
@@ -92,8 +93,28 @@ interface PrisonStayRepository : JpaRepository<PrisonStay, UUID> {
   """,
   )
   fun findMostRecentFor(personIdentifier: String): PrisonStay?
+
+  @Query(
+    """
+    select ps.prisonCode as prisonCode, ps.arrivedAt as arrivedAt, ps.departedAt as departedAt, arr.reason as arrivedReason, dep.reason as departedReason 
+    from PrisonStay ps
+    join MovementInterval arr on ps.personIdentifier = arr.personIdentifier and ps.arrivedAt = arr.validFrom
+    left join MovementInterval dep on ps.personIdentifier = dep.personIdentifier and ps.arrivedAt = dep.validFrom
+    where ps.personIdentifier = :personIdentifier
+    order by ps.arrivedAt
+    """,
+  )
+  fun findAllByPersonIdentifierWithReasons(personIdentifier: String): List<StayWithReasons>
 }
 
 fun PrisonStayRepository.findActiveOrAfter(personIdentifier: String, cutoff: LocalDateTime?) = cutoff?.let {
   findActiveOrAfterCutoff(personIdentifier, it)
 } ?: findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
+
+data class StayWithReasons(
+  val prisonCode: String,
+  val arrivedAt: LocalDateTime,
+  val departedAt: LocalDateTime?,
+  val arrivedReason: MovementReason,
+  val departedReason: MovementReason?,
+)

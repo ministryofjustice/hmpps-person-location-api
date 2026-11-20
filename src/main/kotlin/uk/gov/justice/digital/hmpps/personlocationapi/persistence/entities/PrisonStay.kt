@@ -59,10 +59,6 @@ final class PrisonStay(
   var departedAt: LocalDateTime? = departedAt
     private set
 
-  fun applyPerson(personIdentifier: String) {
-    this.personIdentifier = personIdentifier
-  }
-
   fun matchTarget(target: TargetStay) {
     prisonCode = target.prisonCode
     status = target.status

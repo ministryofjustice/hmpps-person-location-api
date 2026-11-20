@@ -15,6 +15,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.IdGenerator.ne
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.TargetInterval
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Location
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.MovementReason
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -28,6 +29,7 @@ final class MovementInterval(
   validTo: LocalDateTime?,
   origin: Location,
   destination: Location?,
+  reason: MovementReason,
   id: UUID = newUuid(),
 ) : Identifiable {
   @Id
@@ -73,9 +75,10 @@ final class MovementInterval(
   var destination: Location? = destination
     private set
 
-  fun applyPerson(personIdentifier: String) {
-    this.personIdentifier = personIdentifier
-  }
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "reason", nullable = false)
+  var reason: MovementReason = reason
+    private set
 
   fun matchTarget(target: TargetInterval) {
     validFrom = target.validFrom

@@ -14,13 +14,14 @@ import org.springframework.web.bind.annotation.RestController
 import uk.gov.justice.digital.hmpps.personlocationapi.access.Roles
 import uk.gov.justice.digital.hmpps.personlocationapi.config.OpenApiTags.INTEGRATIONS
 import uk.gov.justice.digital.hmpps.personlocationapi.model.timeline.Timeline
+import uk.gov.justice.digital.hmpps.personlocationapi.service.RetrieveTimeline
 import uk.gov.justice.hmpps.kotlin.common.ErrorResponse
 
 @Tag(name = INTEGRATIONS)
 @RestController
 @RequestMapping("/integrations/people/{personIdentifier}")
 @PreAuthorize("hasRole('${Roles.PERSON_PERIODS_RO}')")
-class TimelineController {
+class TimelineController(private val retrieve: RetrieveTimeline) {
   @Operation(
     summary = "Retrieves the timeline of a given person in chronological order. If there is no timeline history for the person, `periods` will be empty.",
     description = "This endpoint is currently proposed and not yet implemented. Please contact Move & Improve squad 1 for feedback and/or comments.",
@@ -45,5 +46,5 @@ class TimelineController {
     ],
   )
   @GetMapping("/timeline")
-  fun timelineFor(@PathVariable personIdentifier: String): Timeline = TODO()
+  fun timelineFor(@PathVariable personIdentifier: String): Timeline = retrieve.periodsFor(personIdentifier)
 }

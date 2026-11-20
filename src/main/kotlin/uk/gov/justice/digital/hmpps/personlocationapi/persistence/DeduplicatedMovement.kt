@@ -64,6 +64,7 @@ internal fun List<DeduplicatedMovement>.projectIntervals(effectiveRefreshFrom: L
     origin = requireNotNull(current.origin),
     destination = current.destination,
     journeyType = current.journeyType,
+    reason = current.reason,
   )
 }
 

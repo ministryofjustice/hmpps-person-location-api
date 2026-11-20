@@ -11,6 +11,8 @@ class RetrieveTimeline(
   private val stayRepository: PrisonStayRepository,
 ) {
   fun periodsFor(personIdentifier: String): Timeline {
+    val episodes = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier)
+    val stays = stayRepository.findAllByPersonIdentifierWithReasons(personIdentifier)
     TODO()
   }
 }

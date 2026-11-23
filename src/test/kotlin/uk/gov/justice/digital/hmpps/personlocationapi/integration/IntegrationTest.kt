@@ -29,6 +29,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.integration.container.Loca
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.container.LocalStackContainer.setMiniStackProperties
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.container.PostgresContainer
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.wiremock.HmppsAuthApiExtension
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.wiremock.NomisMigrationMockServer
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.AuditRevision
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.DomainEventPublication
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.Identifiable
@@ -46,8 +47,6 @@ import uk.gov.justice.hmpps.test.kotlin.auth.JwtAuthorisationHelper
 import java.time.Duration
 import java.time.Instant.now
 import java.util.concurrent.TimeUnit
-import kotlin.collections.map
-import kotlin.jvm.java
 
 @Import(TestConfig::class)
 @ExtendWith(HmppsAuthApiExtension::class)
@@ -76,6 +75,9 @@ abstract class IntegrationTest {
 
   @Autowired
   protected lateinit var refresh: RefreshExternalMovementIntervals
+
+  @Autowired
+  protected lateinit var nomisMigrationMockServer: NomisMigrationMockServer
 
   protected val domainEventsTopic by lazy {
     hmppsQueueService.findByTopicId("hmppseventtopic")
@@ -178,6 +180,10 @@ abstract class IntegrationTest {
     if (!result) {
       throw IllegalStateException("Predicate not met before timeout")
     }
+  }
+
+  protected fun repairRespondsWithRefresh(personIdentifier: String) {
+    nomisMigrationMockServer.requestRepairCallsRefresh(personIdentifier)
   }
 
   protected fun setAuthorisation(

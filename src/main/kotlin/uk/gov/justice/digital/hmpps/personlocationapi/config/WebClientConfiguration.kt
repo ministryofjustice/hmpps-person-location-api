@@ -1,5 +1,6 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.config
 
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager
@@ -15,7 +16,9 @@ import java.time.Duration
 import java.time.Duration.ofSeconds
 
 @Configuration
-class WebClientConfiguration {
+class WebClientConfiguration(
+  @Value($$"${integration.nomis-migration.url}") private val nomisMigrationBaseUri: String,
+) {
   @Bean
   fun tokenResponseClient(): WebClientReactiveClientCredentialsTokenResponseClient {
     val client = WebClientReactiveClientCredentialsTokenResponseClient()
@@ -29,6 +32,9 @@ class WebClientConfiguration {
   }
 
   private fun Throwable.isRetryableException(): Boolean = this is IOException || this is WebClientRequestException || (this is WebClientResponseException && this.statusCode.is5xxServerError)
+
+  @Bean
+  fun nomisMigrationWebClient(authorizedClientManager: OAuth2AuthorizedClientManager, builder: Builder) = authorisedWebClient(nomisMigrationBaseUri, builder, authorizedClientManager, ofSeconds(10))
 
   fun authorisedWebClient(
     url: String,

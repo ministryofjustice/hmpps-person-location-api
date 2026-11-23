@@ -1,0 +1,48 @@
+sequenceDiagram
+    autonumber
+    actor Client as "Reception admission screen"
+    participant PersonLocationApi as "Person Location API"
+    participant PersonLocationDb as "Person Location DB"
+    participant Relay as "Outbox Poller"
+    participant Topic as "AWS SNS"
+    participant Dc1 as "Downstream client 1"
+    participant Dc2 as "Downstream client 2"
+
+    rect rgb(255, 250, 240)
+        Note over Client, PersonLocationDb: 1. Synchronous API Request & Transactional Outbox
+        Client->>+PersonLocationApi: Forward Request
+        PersonLocationApi->>+PersonLocationDb: begin transaction
+        PersonLocationDb-->>PersonLocationDb: insert into external_movement
+        PersonLocationDb-->>PersonLocationDb: insert into hmpps_domain_event (e.g. person.period-of-custody.commenced)
+        PersonLocationDb-->>-PersonLocationApi: commit transaction
+        PersonLocationApi-->>-Client: HTTP 201 Created
+    end
+
+    rect rgb(255, 250, 240)
+        Note over PersonLocationDb, Topic: 2. Asynchronous Event Publication
+        loop Poll Unprocessed Events
+            Relay->>+PersonLocationDb: select * from hmpps_domain_event where published = false
+            PersonLocationDb-->>-Relay: Return unpublished events
+            Relay->>+Topic: Publish Event (e.g. person.period-of-custody.commenced)
+            Topic-->>-Relay: ACK
+            Relay->>+PersonLocationDb: update outbox_table set published = true
+            PersonLocationDb-->>-Relay: Confirmed
+        end
+    end
+
+    rect rgb(255, 250, 240)
+        Note over Topic, Dc2: 3. Asynchronous Event Consumption (Choreography)
+        par Independent Downstream Consumers
+            Topic->>+Dc1: Deliver event (e.g. person.period-of-custody.commenced)
+            Dc1->>PersonLocationApi: Get current state
+            Dc1->>Dc1: Check idempotency
+            Dc1->>Dc1: Create / Update related record(s)
+            Dc1-->>-Topic: ACK
+        and
+            Topic->>+Dc2: Deliver event (e.g. person.period-of-custody.commenced)
+            Dc2->>PersonLocationApi: Get current state
+            Dc2->>Dc2: Check idempotency
+            Dc2->>Dc2: Create / Update related record(s)
+            Dc2-->>-Topic: ACK
+        end
+    end

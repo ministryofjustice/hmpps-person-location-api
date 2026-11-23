@@ -1,6 +1,6 @@
 services:
   localstack:
-    image: nahuelnucera/ministack:latest
+    image: ministackorg/ministack:latest
     networks:
       - hmpps
     ports:

@@ -6,7 +6,6 @@ import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.info.Contact
 import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.security.SecurityRequirement
-import io.swagger.v3.oas.models.security.SecurityScheme
 import io.swagger.v3.oas.models.servers.Server
 import io.swagger.v3.oas.models.tags.Tag
 import org.springdoc.core.customizers.OperationCustomizer
@@ -75,29 +74,23 @@ class OpenApiConfiguration(buildProperties: BuildProperties, private val context
         emptyList()
       }
       if (roles.isNotEmpty()) {
-        operation.description = """
-            ${operation.description ?: ""}
-            
+        val rolesDescription = """
             Requires one of the following roles:
-            ${roles.joinToString(prefix = "* ", separator = "\n* ")}
+            ${roles.joinToString(prefix = "* ", separator = "${System.lineSeparator()}* ")}
         """.trimMargin()
-
+        operation.description = operation.description?.let { des ->
+          """
+            $des
+          """.trimMargin()
+        } ?: rolesDescription
         roles.forEach { role ->
           operation.addSecurityItem(SecurityRequirement().addList(role, listOf("read")))
         }
       }
+      operation
     }
-
-    operation
   }
 }
 
 private fun HandlerMethod.preAuthorizeForMethodOrClass() = getMethodAnnotation(PreAuthorize::class.java)?.value
   ?: beanType.getAnnotation(PreAuthorize::class.java)?.value
-
-private fun SecurityScheme.addBearerJwtRequirement(role: String): SecurityScheme = type(SecurityScheme.Type.HTTP)
-  .scheme("bearer")
-  .bearerFormat("JWT")
-  .`in`(SecurityScheme.In.HEADER)
-  .name("Authorization")
-  .description("A HMPPS Auth access token with the `$role` role.")

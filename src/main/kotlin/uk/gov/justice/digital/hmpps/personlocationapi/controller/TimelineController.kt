@@ -24,7 +24,6 @@ import uk.gov.justice.hmpps.kotlin.common.ErrorResponse
 class TimelineController(private val retrieve: RetrieveTimeline) {
   @Operation(
     summary = "Retrieves the timeline of a given person in chronological order. If there is no timeline history for the person, `periods` will be empty.",
-    description = "This endpoint is currently proposed and not yet implemented. Please contact Move & Improve squad 1 for feedback and/or comments.",
   )
   @ApiResponses(
     value = [

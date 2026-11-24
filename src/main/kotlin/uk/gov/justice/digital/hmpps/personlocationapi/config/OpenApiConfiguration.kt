@@ -1,7 +1,6 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.config
 
 import io.swagger.v3.core.util.PrimitiveType
-import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.info.Contact
@@ -21,7 +20,6 @@ import org.springframework.expression.spel.standard.SpelExpressionParser
 import org.springframework.expression.spel.support.StandardEvaluationContext
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.method.HandlerMethod
-import uk.gov.justice.digital.hmpps.personlocationapi.access.Roles
 import uk.gov.justice.digital.hmpps.personlocationapi.config.OpenApiTags.INTEGRATIONS
 import uk.gov.justice.digital.hmpps.personlocationapi.config.OpenApiTags.SYNC
 import java.time.LocalTime
@@ -55,14 +53,6 @@ class OpenApiConfiguration(buildProperties: BuildProperties, private val context
       Info().title("HMPPS Person Location Api").version(version)
         .contact(Contact().name("HMPPS Digital Studio").email("feedback@digital.justice.gov.uk")),
     )
-    .components(
-      Components()
-        .addSecuritySchemes(
-          Roles.PERSON_PERIODS_RO,
-          SecurityScheme().addBearerJwtRequirement(Roles.PERSON_PERIODS_RO),
-        ),
-    )
-    .addSecurityItem(SecurityRequirement().addList(Roles.PERSON_LOCATION_RO, listOf("read")))
     .also { PrimitiveType.customClasses()[LocalTime::class.java.name] = PrimitiveType.PARTIAL_TIME }
 
   @Bean
@@ -85,9 +75,16 @@ class OpenApiConfiguration(buildProperties: BuildProperties, private val context
         emptyList()
       }
       if (roles.isNotEmpty()) {
-        operation.description = "${operation.description ?: ""}\n\n" +
-          "Requires one of the following roles:\n" +
-          roles.joinToString(prefix = "* ", separator = "\n* ")
+        operation.description = """
+            ${operation.description ?: ""}
+            
+            Requires one of the following roles:
+            ${roles.joinToString(prefix = "* ", separator = "\n* ")}
+        """.trimMargin()
+
+        roles.forEach { role ->
+          operation.addSecurityItem(SecurityRequirement().addList(role, listOf("read")))
+        }
       }
     }
 

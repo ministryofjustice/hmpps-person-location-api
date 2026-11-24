@@ -1,6 +1,8 @@
 integration:
   hmpps-auth:
     url: "https://sign-in-dev.hmpps.service.justice.gov.uk/auth"
+  nomis-migration:
+    url: "https://prisoner-nomis-migration-dev.hmpps.service.justice.gov.uk"
 
 service:
   api-base-url: "https://person-location-api-dev.hmpps.service.justice.gov.uk"

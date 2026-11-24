@@ -8,6 +8,8 @@ management.endpoint:
 integration:
   hmpps-auth:
     url: "http://localhost:8090/auth"
+  nomis-migration:
+    url: "http://localhost:9990"
 
 spring:
   jpa:

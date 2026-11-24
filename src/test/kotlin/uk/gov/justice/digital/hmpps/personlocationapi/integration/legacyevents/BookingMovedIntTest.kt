@@ -85,6 +85,8 @@ class BookingMovedIntTest(
     refresh.execute(RefreshPersonMovementIntervals(toIdentifier))
     assertThat(episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(toIdentifier)).hasSize(1)
 
+    repairRespondsWithRefresh(toIdentifier)
+    repairRespondsWithRefresh(fromIdentifier)
     sendDomainEvent(
       bookingMovedEvent(
         seriesToMove.legacyId!!,

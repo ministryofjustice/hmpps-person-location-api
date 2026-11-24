@@ -3,8 +3,7 @@ package uk.gov.justice.digital.hmpps.personlocationapi.service
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import uk.gov.justice.digital.hmpps.personlocationapi.event.domain.PrisonerMerged
-import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.InternalEventEmitter
-import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.RefreshPersonMovementIntervals
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.nomis.MigrationClient
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.CustodialSeriesRepository
 
@@ -13,7 +12,7 @@ class PrisonerMergedHandler(
   private val transactionTemplate: TransactionTemplate,
   private val seriesRepository: CustodialSeriesRepository,
   private val movementRepository: ExternalMovementRepository,
-  private val iee: InternalEventEmitter,
+  private val migrationClient: MigrationClient,
 ) {
   fun handle(de: PrisonerMerged) {
     val pmi = de.additionalInformation
@@ -23,10 +22,13 @@ class PrisonerMergedHandler(
       val movements = movementRepository.findByPersonIdentifier(pmi.removedNomsNumber)
         .onEach { it.applyPerson(pmi.nomsNumber) }
       return@execute if (series.isNotEmpty() || movements.isNotEmpty()) {
-        listOf(pmi.removedNomsNumber, pmi.nomsNumber).map { RefreshPersonMovementIntervals(it) }
+        listOf(pmi.nomsNumber, pmi.removedNomsNumber)
       } else {
         null
       }
-    }?.also { iee.publishInternalEvents(it) }
+    }?.forEach { pi ->
+      /* repair will also refresh episodes/stays */
+      migrationClient.requestRepair(pi)
+    }
   }
 }

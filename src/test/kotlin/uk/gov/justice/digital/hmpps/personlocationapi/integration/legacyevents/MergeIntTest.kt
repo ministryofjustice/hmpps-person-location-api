@@ -45,6 +45,8 @@ class MergeIntTest(
     val movement = givenMovement(externalMovement(series, movementType = ExternalMovement.Type.ARRIVAL, journeyType = ExternalJourney.Type.ADMISSION))
     refresh.execute(RefreshPersonMovementIntervals(fromIdentifier))
 
+    repairRespondsWithRefresh(toIdentifier)
+    repairRespondsWithRefresh(fromIdentifier)
     sendDomainEvent(mergeEvent(fromIdentifier, toIdentifier))
 
     waitUntil { findSeries(series.id)!!.version!! > 0 }

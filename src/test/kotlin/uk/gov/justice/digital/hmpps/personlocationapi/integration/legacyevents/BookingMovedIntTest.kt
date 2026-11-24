@@ -118,7 +118,7 @@ class BookingMovedIntTest(
       assertThat(found?.personIdentifier).isEqualTo(toIdentifier)
     }
 
-    waitUntil { episodeRepository.findMostRecentFor(toIdentifier).isNotEmpty() }
+    waitUntil { episodeRepository.findMostRecentFor(toIdentifier).firstOrNull()?.status == CustodialEpisode.Status.ACTIVE }
     val to = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(toIdentifier)
     assertThat(to).hasSize(2)
     assertThat(to.first().commencedAt).isEqualTo(movementToMove.occurredAt)

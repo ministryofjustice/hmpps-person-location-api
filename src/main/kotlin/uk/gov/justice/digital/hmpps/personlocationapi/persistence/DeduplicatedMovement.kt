@@ -23,6 +23,7 @@ data class DeduplicatedMovement(
   val destination: Location?,
   val reason: MovementReason,
   val externalReference: ExternalReference?,
+  val legacyBookingIds: List<Long>,
 )
 
 private fun Location?.priority(): Int = when (this) {
@@ -44,6 +45,7 @@ internal fun List<ExternalMovement>.deduplicateAndPrioritize(): List<Deduplicate
       reason = duplicates.map { it.reason }.distinct()
         .let { if (it.size > 1) HierarchicalReason(it.filterIsInstance<CodedReason>()) else it.single() },
       externalReference = duplicates.firstOrNull { it.scheduleReference != null }?.scheduleReference,
+      legacyBookingIds = duplicates.mapNotNull { it.legacyIds?.first },
     )
   }.sortedBy { it.occurredAt }
 
@@ -76,12 +78,21 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
   var currentEpisode: TargetEpisode? = null
   var currentStay: TargetStay? = null
   var currentJourney: TargetJourney? = null
+  val currentStayBookingIds: MutableList<Long> = mutableListOf()
 
-  for ((occurredAt, movementType, journeyType, origin, destination, reason, externalReference) in this) {
+  for (index in indices) {
+    val (occurredAt, movementType, journeyType, origin, destination, reason, externalReference, legacyIds) = this[index]
+
     when (movementType) {
       ExternalMovement.Type.DEPARTURE -> {
-        if (origin is Prison && reason.isNotForMerge()) {
-          if (journeyType == ExternalJourney.Type.RELEASE) {
+        if (origin is Prison) {
+          val canRelease = if (journeyType == ExternalJourney.Type.RELEASE) {
+            shouldProcessRelease(index, reason, currentStay, currentStayBookingIds)
+          } else {
+            true
+          }
+
+          if (journeyType == ExternalJourney.Type.RELEASE && canRelease) {
             currentStay?.apply {
               departedAt = occurredAt
               status = PrisonStay.Status.RELEASED
@@ -90,6 +101,7 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
               }
             }
             currentStay = null
+            currentStayBookingIds.clear()
 
             currentEpisode?.apply {
               if (reason is CodedReason && (reason.isAbscondedOrEscaped())) {
@@ -104,8 +116,8 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
                 currentEpisode = null
               }
             }
-          } else {
-            if (currentJourney == null) {
+          } else if (journeyType != ExternalJourney.Type.RELEASE) {
+            if (currentJourney == null && (destination !is Prison || destination.isRealPrison())) {
               currentJourney = TargetJourney(
                 commencedAt = occurredAt,
                 journeyType = journeyType,
@@ -122,6 +134,7 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
                   stays.remove(this)
                 }
                 currentStay = null
+                currentStayBookingIds.clear()
               } else {
                 status = PrisonStay.Status.IN_TRANSIT_EXTERNAL
               }
@@ -148,10 +161,10 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
         currentJourney = null
 
         if (destination is Prison) {
-          if (currentEpisode == null) {
+          if (currentEpisode == null && destination.isRealPrison()) {
             currentEpisode = TargetEpisode(commencedAt = occurredAt).also { episodes.add(it) }
           } else {
-            currentEpisode.status = CustodialEpisode.Status.ACTIVE
+            currentEpisode?.status = CustodialEpisode.Status.ACTIVE
           }
 
           if (currentStay == null || currentStay.prisonCode != destination.code) {
@@ -162,10 +175,15 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
                 stays.remove(this)
               }
             }
-            currentStay = TargetStay(
-              arrivedAt = occurredAt,
-              prisonCode = destination.code,
-            ).also { stays.add(it) }
+            if (destination.isRealPrison()) {
+              currentStay = TargetStay(
+                arrivedAt = occurredAt,
+                prisonCode = destination.code,
+              ).also { stays.add(it) }
+              currentStayBookingIds.addAll(legacyIds)
+            } else {
+              currentStayBookingIds.clear()
+            }
           }
         }
       }
@@ -175,4 +193,24 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
   return ProjectedTimeline(episodes, stays, journeys)
 }
 
-private fun MovementReason.isNotForMerge() = (this !is CodedReason || !this.isForMerge())
+private fun List<DeduplicatedMovement>.shouldProcessRelease(
+  index: Int,
+  reason: MovementReason,
+  currentStay: TargetStay?,
+  currentStayBookingIds: List<Long>,
+): Boolean {
+  if (!reason.isForMerge()) {
+    return true
+  }
+
+  val movement = this[index]
+  val hasNoLaterMovement = index == lastIndex
+  val hasOpenStay = currentStay != null && currentStay.departedAt == null
+  val isSameBooking = currentStayBookingIds.size == 1 &&
+    movement.legacyBookingIds.size == 1 &&
+    currentStayBookingIds.single() == movement.legacyBookingIds.single()
+
+  return hasOpenStay && isSameBooking && hasNoLaterMovement
+}
+
+private fun MovementReason.isForMerge() = (this is CodedReason && isMergeReason())

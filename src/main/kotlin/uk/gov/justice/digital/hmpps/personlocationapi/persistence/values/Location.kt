@@ -1,5 +1,6 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.persistence.values
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import io.swagger.v3.oas.annotations.media.DiscriminatorMapping
@@ -31,10 +32,25 @@ const val SIMPLE_LOCATION = "SimpleLocation"
 )
 sealed interface Location {
   val description: String
+
+  @JsonIgnore
+  fun isRealPrison(): Boolean = this is Prison && !isGhostHolding() && !isTransferHolding()
 }
 
 @Schema(description = "Prison location", name = PRISON)
-data class Prison(val code: String, override val description: String) : Location
+data class Prison(val code: String, override val description: String) : Location {
+
+  @JsonIgnore
+  fun isGhostHolding(): Boolean = code == GHOST_HOLDING_CODE
+
+  @JsonIgnore
+  fun isTransferHolding(): Boolean = code == TRANSFER_HOLDING
+
+  companion object {
+    const val TRANSFER_HOLDING = "TRN"
+    const val GHOST_HOLDING_CODE = "ZZGHI"
+  }
+}
 
 @Schema(description = "Court location", name = COURT)
 data class Court(val code: String, override val description: String) : Location

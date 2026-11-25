@@ -37,7 +37,7 @@ data class CodedReason(val code: String, override val description: String) : Mov
   fun isDeceased(): Boolean = code == DECEASED
 
   @JsonIgnore
-  fun isForMerge(): Boolean = code == MERGED
+  fun isMergeReason(): Boolean = code == MERGED
 
   companion object {
     private const val DECEASED = "DEC"

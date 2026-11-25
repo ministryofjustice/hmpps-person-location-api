@@ -123,10 +123,14 @@ final class ExternalMovement(
   @PostLoad
   private fun load() {
     appliedActions = listOf()
+    legacyIds = legacyIds()
   }
 
   @Transient
-  val legacyIds: Pair<Long, Int>? = legacyId?.split("_")?.takeIf { it.size == 2 }?.let {
+  var legacyIds: Pair<Long, Int>? = legacyIds()
+    private set
+
+  private fun legacyIds(): Pair<Long, Int>? = legacyId?.split("_")?.takeIf { it.size == 2 }?.let {
     Pair(it[0].toLong(), it[1].toInt())
   }
 

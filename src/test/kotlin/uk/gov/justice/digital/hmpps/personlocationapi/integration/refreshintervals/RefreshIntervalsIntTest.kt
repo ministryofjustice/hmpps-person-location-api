@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import uk.gov.justice.digital.hmpps.personlocationapi.event.internal.RefreshPersonMovementIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.externalReference
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.newId
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.personIdentifier
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.IntegrationTest
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.CustodialSeriesOperations
@@ -915,5 +916,192 @@ class RefreshIntervalsIntTest(
 
     val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
     assertThat(journeys).isEmpty()
+  }
+
+  @Test
+  fun `MRG release on same series with no later movement closes stay and episode`() {
+    val personIdentifier = personIdentifier()
+    val start = LocalDate.now().atTime(10, 0).minusDays(3)
+    val series = givenSeries(custodialSeries(personIdentifier, openedAt = start, legacyId = newId()))
+    val prisonOne = prison()
+
+    val admission = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = start,
+        legacyId = "${series.legacyId}_1",
+      ),
+    )
+    val mrgRelease = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        origin = prisonOne,
+        occurredAt = admission.occurredAt.plusHours(6),
+        reason = CodedReason("MRG", "Administrative release due to merge"),
+        legacyId = "${series.legacyId}_2",
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stay = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier).single()
+    assertThat(stay.arrivedAt).isEqualTo(admission.occurredAt)
+    assertThat(stay.departedAt).isEqualTo(mrgRelease.occurredAt)
+    assertThat(stay.status).isEqualTo(PrisonStay.Status.RELEASED)
+
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
+    assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
+    assertThat(episode.concludedAt).isEqualTo(mrgRelease.occurredAt)
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
+  }
+
+  @Test
+  fun `MRG release on different series with no later movement does not close stay or episode`() {
+    val personIdentifier = personIdentifier()
+    val start = LocalDate.now().atTime(10, 0).minusDays(7)
+    val prisonOne = prison()
+
+    val seriesOne = givenSeries(custodialSeries(personIdentifier, openedAt = start, legacyId = newId()))
+    val admissionOne = givenMovement(
+      externalMovement(
+        seriesOne,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = start,
+        legacyId = "${seriesOne.legacyId}_1",
+      ),
+    )
+    val seriesTwo = givenSeries(
+      custodialSeries(
+        personIdentifier,
+        openedAt = start.plusDays(2),
+        legacyId = newId(),
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        origin = prisonOne,
+        occurredAt = start.plusDays(2),
+        reason = CodedReason("MRG", "Administrative release due to merge"),
+        legacyId = "${seriesTwo.legacyId}_1",
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stay = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier).single()
+    assertThat(stay.arrivedAt).isEqualTo(admissionOne.occurredAt)
+    assertThat(stay.departedAt).isNull()
+    assertThat(stay.status).isEqualTo(PrisonStay.Status.RESIDENT)
+
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
+    assertThat(episode.commencedAt).isEqualTo(admissionOne.occurredAt)
+    assertThat(episode.concludedAt).isNull()
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.ACTIVE)
+  }
+
+  @Test
+  fun `recapture arrival after UAL restores active episode and opens new stay`() {
+    val personIdentifier = personIdentifier()
+    val start = LocalDate.now().atTime(9, 0).minusDays(10)
+    val series = givenSeries(custodialSeries(personIdentifier, openedAt = start))
+    val prisonOne = prison()
+    val prisonTwo = prison()
+
+    val admission = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = start,
+      ),
+    )
+    val ual = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        reason = CodedReason("UAL", "Unlawfully at large"),
+        origin = prisonOne,
+        occurredAt = start.plusDays(2),
+      ),
+    )
+    val recapture = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonTwo,
+        occurredAt = ual.occurredAt.plusDays(3),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
+    assertThat(stays).hasSize(2)
+    with(stays.first()) {
+      assertThat(arrivedAt).isEqualTo(admission.occurredAt)
+      assertThat(departedAt).isEqualTo(ual.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+    with(stays.last()) {
+      assertThat(prisonCode).isEqualTo(prisonTwo.code)
+      assertThat(arrivedAt).isEqualTo(recapture.occurredAt)
+      assertThat(departedAt).isNull()
+      assertThat(status).isEqualTo(PrisonStay.Status.RESIDENT)
+    }
+
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
+    assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
+    assertThat(episode.concludedAt).isNull()
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.ACTIVE)
+  }
+
+  @Test
+  fun `deleting admission removes stays, episodes, and journeys`() {
+    val personIdentifier = personIdentifier()
+    val start = LocalDate.now().atTime(10, 0).minusDays(4)
+    val series = givenSeries(custodialSeries(personIdentifier, openedAt = start))
+    val prisonOne = prison()
+
+    val admission = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = start,
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        origin = prisonOne,
+        occurredAt = start.plusDays(2),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+    assertThat(stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)).hasSize(1)
+
+    removeMovement(admission.id)
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    assertThat(stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)).isEmpty()
+    assertThat(episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier)).isEmpty()
+    assertThat(journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)).isEmpty()
   }
 }

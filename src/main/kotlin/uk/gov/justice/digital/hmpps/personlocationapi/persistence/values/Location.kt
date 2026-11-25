@@ -34,7 +34,13 @@ sealed interface Location {
 }
 
 @Schema(description = "Prison location", name = PRISON)
-data class Prison(val code: String, override val description: String) : Location
+data class Prison(val code: String, override val description: String) : Location {
+
+  fun isGhostHolding(): Boolean = code == GHOST_HOLDING_CODE
+  companion object {
+    const val GHOST_HOLDING_CODE = "ZZGHI"
+  }
+}
 
 @Schema(description = "Court location", name = COURT)
 data class Court(val code: String, override val description: String) : Location

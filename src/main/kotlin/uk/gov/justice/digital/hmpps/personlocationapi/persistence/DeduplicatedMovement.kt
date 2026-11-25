@@ -80,7 +80,7 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
   for ((occurredAt, movementType, journeyType, origin, destination, reason, externalReference) in this) {
     when (movementType) {
       ExternalMovement.Type.DEPARTURE -> {
-        if (origin is Prison && reason.isNotForMerge()) {
+        if (origin is Prison && (reason.isNotForMerge() || origin.isGhostHolding())) {
           if (journeyType == ExternalJourney.Type.RELEASE) {
             currentStay?.apply {
               departedAt = occurredAt
@@ -148,10 +148,10 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
         currentJourney = null
 
         if (destination is Prison) {
-          if (currentEpisode == null) {
+          if (currentEpisode == null && !destination.isGhostHolding()) {
             currentEpisode = TargetEpisode(commencedAt = occurredAt).also { episodes.add(it) }
           } else {
-            currentEpisode.status = CustodialEpisode.Status.ACTIVE
+            currentEpisode?.status = CustodialEpisode.Status.ACTIVE
           }
 
           if (currentStay == null || currentStay.prisonCode != destination.code) {
@@ -162,10 +162,12 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
                 stays.remove(this)
               }
             }
-            currentStay = TargetStay(
-              arrivedAt = occurredAt,
-              prisonCode = destination.code,
-            ).also { stays.add(it) }
+            if (!destination.isGhostHolding()) {
+              currentStay = TargetStay(
+                arrivedAt = occurredAt,
+                prisonCode = destination.code,
+              ).also { stays.add(it) }
+            }
           }
         }
       }

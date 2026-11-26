@@ -41,6 +41,7 @@ data class TargetStay(
   val arrivedAt: LocalDateTime,
   var departedAt: LocalDateTime? = null,
   var status: PrisonStay.Status = PrisonStay.Status.RESIDENT,
+  val legacyBookingIds: MutableSet<Long>,
 )
 
 data class TargetEpisode(

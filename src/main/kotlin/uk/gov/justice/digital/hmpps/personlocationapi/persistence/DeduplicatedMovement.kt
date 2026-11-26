@@ -23,7 +23,7 @@ data class DeduplicatedMovement(
   val destination: Location?,
   val reason: MovementReason,
   val externalReference: ExternalReference?,
-  val legacyBookingIds: List<Long>,
+  val legacyBookingIds: Set<Long>,
 )
 
 private fun Location?.priority(): Int = when (this) {
@@ -45,7 +45,7 @@ internal fun List<ExternalMovement>.deduplicateAndPrioritize(): List<Deduplicate
       reason = duplicates.map { it.reason }.distinct()
         .let { if (it.size > 1) HierarchicalReason(it.filterIsInstance<CodedReason>()) else it.single() },
       externalReference = duplicates.firstOrNull { it.scheduleReference != null }?.scheduleReference,
-      legacyBookingIds = duplicates.mapNotNull { it.legacyIds?.first },
+      legacyBookingIds = duplicates.mapNotNull { it.legacyIds?.first }.toSet(),
     )
   }.sortedBy { it.occurredAt }
 
@@ -78,16 +78,15 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
   var currentEpisode: TargetEpisode? = null
   var currentStay: TargetStay? = null
   var currentJourney: TargetJourney? = null
-  val currentStayBookingIds: MutableList<Long> = mutableListOf()
 
   for (index in indices) {
-    val (occurredAt, movementType, journeyType, origin, destination, reason, externalReference, legacyIds) = this[index]
+    val (occurredAt, movementType, journeyType, origin, destination, reason, externalReference, legacyBookingIds) = this[index]
 
     when (movementType) {
       ExternalMovement.Type.DEPARTURE -> {
         if (origin is Prison) {
           val canRelease = if (journeyType == ExternalJourney.Type.RELEASE) {
-            shouldProcessRelease(index, reason, currentStay, currentStayBookingIds)
+            shouldProcessRelease(index, reason, currentStay)
           } else {
             true
           }
@@ -101,7 +100,6 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
               }
             }
             currentStay = null
-            currentStayBookingIds.clear()
 
             currentEpisode?.apply {
               if (reason is CodedReason && (reason.isAbscondedOrEscaped())) {
@@ -134,7 +132,6 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
                   stays.remove(this)
                 }
                 currentStay = null
-                currentStayBookingIds.clear()
               } else {
                 status = PrisonStay.Status.IN_TRANSIT_EXTERNAL
               }
@@ -149,6 +146,7 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
           if (destination is Prison && destination.code == prisonCode) {
             departedAt = null
             status = PrisonStay.Status.RESIDENT
+            this.legacyBookingIds.addAll(legacyBookingIds)
           }
         }
         currentJourney?.apply {
@@ -179,10 +177,8 @@ internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
               currentStay = TargetStay(
                 arrivedAt = occurredAt,
                 prisonCode = destination.code,
+                legacyBookingIds = legacyBookingIds.toMutableSet(),
               ).also { stays.add(it) }
-              currentStayBookingIds.addAll(legacyIds)
-            } else {
-              currentStayBookingIds.clear()
             }
           }
         }
@@ -197,7 +193,6 @@ private fun List<DeduplicatedMovement>.shouldProcessRelease(
   index: Int,
   reason: MovementReason,
   currentStay: TargetStay?,
-  currentStayBookingIds: List<Long>,
 ): Boolean {
   if (!reason.isForMerge()) {
     return true
@@ -206,9 +201,9 @@ private fun List<DeduplicatedMovement>.shouldProcessRelease(
   val movement = this[index]
   val hasNoLaterMovement = index == lastIndex
   val hasOpenStay = currentStay != null && currentStay.departedAt == null
-  val isSameBooking = currentStayBookingIds.size == 1 &&
+  val isSameBooking = currentStay?.legacyBookingIds?.size == 1 &&
     movement.legacyBookingIds.size == 1 &&
-    currentStayBookingIds.single() == movement.legacyBookingIds.single()
+    currentStay.legacyBookingIds.single() == movement.legacyBookingIds.single()
 
   return hasOpenStay && isSameBooking && hasNoLaterMovement
 }

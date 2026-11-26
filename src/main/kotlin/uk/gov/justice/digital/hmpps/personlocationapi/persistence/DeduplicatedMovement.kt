@@ -70,6 +70,127 @@ internal fun List<DeduplicatedMovement>.projectIntervals(effectiveRefreshFrom: L
   )
 }
 
+internal fun List<DeduplicatedMovement>.hasStrictAlternation(): Boolean {
+  if (size <= 1) return true
+  return zipWithNext().all { (first, second) -> first.movementType != second.movementType }
+}
+
+internal fun List<DeduplicatedMovement>.normalizeForTimeline(): List<DeduplicatedMovement> {
+  val sorted = sortedBy { it.occurredAt }
+  if (sorted.hasStrictAlternation()) {
+    return sorted
+  }
+
+  val normalized = mutableListOf<DeduplicatedMovement>()
+  var activePrisonCode: String? = null
+  var sawArrivalAtDifferentPrisonSinceDeparture = false
+
+  for (movement in sorted) {
+    when (movement.movementType) {
+      ExternalMovement.Type.ARRIVAL -> {
+        val arrivalPrison = (movement.destination as? Prison)?.code
+        val previous = normalized.lastOrNull()
+
+        if (previous?.movementType == ExternalMovement.Type.ARRIVAL) {
+          val previousPrison = (previous.destination as? Prison)?.code
+          if (arrivalPrison != null && arrivalPrison == previousPrison) {
+            normalized[normalized.lastIndex] = previous.mergeWith(movement)
+            activePrisonCode = arrivalPrison
+            sawArrivalAtDifferentPrisonSinceDeparture = false
+            continue
+          }
+        }
+
+        if (arrivalPrison != null && arrivalPrison == activePrisonCode) {
+          val openArrivalIndex = normalized.indexOfLast {
+            it.movementType == ExternalMovement.Type.ARRIVAL &&
+              (it.destination as? Prison)?.code == arrivalPrison
+          }
+          val hasDepartureAfterOpenArrival = openArrivalIndex >= 0 &&
+            (openArrivalIndex + 1 until normalized.size).any {
+              normalized[it].movementType == ExternalMovement.Type.DEPARTURE
+            }
+
+          if (openArrivalIndex >= 0 && !hasDepartureAfterOpenArrival) {
+            normalized[openArrivalIndex] = normalized[openArrivalIndex].mergeWith(movement)
+            sawArrivalAtDifferentPrisonSinceDeparture = false
+            continue
+          }
+        }
+
+        if (arrivalPrison != null && activePrisonCode != null && arrivalPrison != activePrisonCode) {
+          sawArrivalAtDifferentPrisonSinceDeparture = true
+        }
+
+        activePrisonCode = arrivalPrison
+        normalized += movement
+      }
+
+      ExternalMovement.Type.DEPARTURE -> {
+        val departurePrison = (movement.origin as? Prison)?.code
+        val lastDepartureIndex = normalized.indexOfLast {
+          it.movementType == ExternalMovement.Type.DEPARTURE &&
+            (it.origin as? Prison)?.code == departurePrison
+        }
+
+        if (
+          departurePrison != null &&
+          lastDepartureIndex >= 0 &&
+          !sawArrivalAtDifferentPrisonSinceDeparture
+        ) {
+          val earlierDeparture = normalized[lastDepartureIndex]
+          val hasArrivalBetween = (lastDepartureIndex + 1 until normalized.size).any { idx ->
+            val item = normalized[idx]
+            item.movementType == ExternalMovement.Type.ARRIVAL &&
+              (item.destination as? Prison)?.code != departurePrison
+          }
+
+          val keepBothForUalThenRelease =
+            earlierDeparture.reason.isUal() && !movement.reason.isUal()
+
+          val canCollapseReleases =
+            !hasArrivalBetween &&
+              !keepBothForUalThenRelease &&
+              earlierDeparture.journeyType == ExternalJourney.Type.RELEASE &&
+              movement.journeyType == ExternalJourney.Type.RELEASE
+
+          if (canCollapseReleases) {
+            normalized[lastDepartureIndex] = movement.mergeWith(earlierDeparture)
+            if (departurePrison == activePrisonCode) {
+              activePrisonCode = null
+            }
+            continue
+          }
+        }
+
+        val hasPrecedingArrival = normalized.any { it.movementType == ExternalMovement.Type.ARRIVAL }
+        if (!hasPrecedingArrival) {
+          normalized += movement
+          continue
+        }
+
+        if (departurePrison != null && departurePrison == activePrisonCode) {
+          activePrisonCode = null
+        }
+        sawArrivalAtDifferentPrisonSinceDeparture = false
+        normalized += movement
+      }
+    }
+  }
+
+  return normalized
+}
+
+private fun MovementReason.isUal(): Boolean = this is CodedReason && isAbscondedOrEscaped()
+
+private fun DeduplicatedMovement.mergeWith(other: DeduplicatedMovement): DeduplicatedMovement = copy(
+  journeyType = maxOf(journeyType, other.journeyType, compareBy { it.ordinal }),
+  destination = destination ?: other.destination,
+  origin = origin ?: other.origin,
+  externalReference = externalReference ?: other.externalReference,
+  legacyBookingIds = legacyBookingIds + other.legacyBookingIds,
+)
+
 internal fun List<DeduplicatedMovement>.projectTimeline(): ProjectedTimeline {
   val episodes = mutableListOf<TargetEpisode>()
   val stays = mutableListOf<TargetStay>()

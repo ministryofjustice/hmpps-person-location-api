@@ -21,6 +21,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.Priso
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.findActiveOrAfter
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.findFromCutoffOnward
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.mergeEntities
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.normalizeForTimeline
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.projectIntervals
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.projectTimeline
 
@@ -63,8 +64,9 @@ class RefreshExternalMovementIntervals(
       .filter { replayStartAt == null || !it.occurredAt.isBefore(replayStartAt) }
       .deduplicateAndPrioritize()
 
-    val targetIntervals = deduplicatedMovements.projectIntervals(effectiveRefreshFrom)
-    val targetTimeline = deduplicatedMovements.projectTimeline()
+    val orderedMovements = deduplicatedMovements.normalizeForTimeline()
+    val targetIntervals = orderedMovements.projectIntervals(effectiveRefreshFrom)
+    val targetTimeline = orderedMovements.projectTimeline()
 
     val activeTargetEpisodes = targetTimeline.episodes.filter {
       effectiveRefreshFrom == null || it.concludedAt == null || !it.concludedAt!!.isBefore(effectiveRefreshFrom)

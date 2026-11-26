@@ -26,6 +26,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedRe
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.SimpleLocation
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.externalreference.ExternalReferenceEntity
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 class RefreshIntervalsIntTest(
   @Autowired seriesOps: CustodialSeriesOperations,
@@ -1103,5 +1104,280 @@ class RefreshIntervalsIntTest(
     assertThat(stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)).isEmpty()
     assertThat(episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier)).isEmpty()
     assertThat(journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)).isEmpty()
+  }
+
+  @Test
+  fun `absorbs overlapping arrivals and collapses duplicate releases at the same prison`() {
+    val personIdentifier = personIdentifier()
+    val prison = prison()
+    val firstArrivalTime = LocalDateTime.of(2026, 8, 24, 11, 0)
+    val secondArrivalTime = LocalDateTime.of(2026, 8, 25, 10, 0)
+    val firstReleaseTime = LocalDateTime.of(2026, 8, 25, 11, 0)
+    val secondReleaseTime = LocalDateTime.of(2026, 9, 12, 9, 0)
+
+    val seriesOne = givenSeries(custodialSeries(personIdentifier, openedAt = firstArrivalTime))
+    val seriesTwo = givenSeries(custodialSeries(personIdentifier, openedAt = secondArrivalTime))
+
+    givenMovement(
+      externalMovement(
+        seriesOne,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prison,
+        occurredAt = firstArrivalTime,
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prison,
+        occurredAt = secondArrivalTime,
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesOne,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        origin = prison,
+        occurredAt = firstReleaseTime,
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        origin = prison,
+        occurredAt = secondReleaseTime,
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
+    assertThat(stays).hasSize(1)
+    with(stays.single()) {
+      assertThat(prisonCode).isEqualTo(prison.code)
+      assertThat(arrivedAt).isEqualTo(firstArrivalTime)
+      assertThat(departedAt).isEqualTo(secondReleaseTime)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
+    assertThat(episode.commencedAt).isEqualTo(firstArrivalTime)
+    assertThat(episode.concludedAt).isEqualTo(secondReleaseTime)
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
+  }
+
+  @Test
+  fun `records transfer instead of collapsing departures when arrival at another prison occurs in between`() {
+    val personIdentifier = personIdentifier()
+    val prisonOne = prison()
+    val prisonTwo = prison()
+    val start = LocalDate.now().atTime(9, 0).minusDays(12)
+    val series = givenSeries(custodialSeries(personIdentifier, openedAt = start))
+
+    val admissionPrisonOne = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = start,
+      ),
+    )
+    val departurePrisonOne = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        origin = prisonOne,
+        occurredAt = admissionPrisonOne.occurredAt.plusDays(2),
+      ),
+    )
+    val arrivalPrisonTwo = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonTwo,
+        occurredAt = departurePrisonOne.occurredAt.plusHours(3),
+      ),
+    )
+    val releasePrisonTwo = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        origin = prisonTwo,
+        occurredAt = arrivalPrisonTwo.occurredAt.plusDays(4),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
+    assertThat(stays).hasSize(2)
+    with(stays.first()) {
+      assertThat(prisonCode).isEqualTo(prisonOne.code)
+      assertThat(arrivedAt).isEqualTo(admissionPrisonOne.occurredAt)
+      assertThat(departedAt).isEqualTo(departurePrisonOne.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+    with(stays.last()) {
+      assertThat(prisonCode).isEqualTo(prisonTwo.code)
+      assertThat(arrivedAt).isEqualTo(arrivalPrisonTwo.occurredAt)
+      assertThat(departedAt).isEqualTo(releasePrisonTwo.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+  }
+
+  @Test
+  fun `can handle genuine release and readmission to the same prison`() {
+    val personIdentifier = personIdentifier()
+    val start = LocalDate.now().atTime(10, 0).minusDays(14)
+    val series = givenSeries(custodialSeries(personIdentifier, openedAt = start))
+    val prison = prison()
+    val ad1 = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prison,
+        occurredAt = start,
+      ),
+    )
+    val rel1 = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        destination = prison,
+        occurredAt = start.plusDays(1),
+      ),
+    )
+    val ad2 = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prison,
+        occurredAt = start.plusDays(3),
+      ),
+    )
+    val rel2 = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        destination = prison,
+        occurredAt = start.plusDays(4),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
+    assertThat(stays).hasSize(2)
+    with(stays.first()) {
+      assertThat(arrivedAt).isEqualTo(ad1.occurredAt)
+      assertThat(departedAt).isEqualTo(rel1.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+    with(stays.last()) {
+      assertThat(arrivedAt).isEqualTo(ad2.occurredAt)
+      assertThat(departedAt).isEqualTo(rel2.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+
+    val episodes = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).reversed()
+    assertThat(episodes).hasSize(2)
+    with(episodes.first()) {
+      assertThat(commencedAt).isEqualTo(ad1.occurredAt)
+      assertThat(concludedAt).isEqualTo(rel1.occurredAt)
+      assertThat(status).isEqualTo(CustodialEpisode.Status.COMPLETED)
+    }
+    with(episodes.last()) {
+      assertThat(commencedAt).isEqualTo(ad2.occurredAt)
+      assertThat(concludedAt).isEqualTo(rel2.occurredAt)
+      assertThat(status).isEqualTo(CustodialEpisode.Status.COMPLETED)
+    }
+
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
+    assertThat(journeys).isEmpty()
+  }
+
+  @Test
+  fun `concludes journey at release and ignores late temporary absence arrival after release`() {
+    val personIdentifier = personIdentifier()
+    val series = givenSeries(custodialSeries(personIdentifier, openedAt = LocalDateTime.of(2009, 4, 30, 16, 5, 26)))
+    val prisonOne = prison()
+
+    val admission = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2025, 4, 30, 16, 5, 26),
+      ),
+    )
+    val tapDep = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.TEMPORARY_ABSENCE,
+        origin = prisonOne,
+        scheduleReference = externalReference(ExternalReferenceEntity.TEMPORARY_ABSENCE),
+        occurredAt = LocalDateTime.of(2025, 6, 4, 9, 30, 0),
+      ),
+    )
+    val rel = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        origin = prisonOne,
+        occurredAt = LocalDateTime.of(2025, 7, 3, 17, 45, 9),
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.TEMPORARY_ABSENCE,
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2025, 7, 3, 17, 45, 52),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
+    assertThat(stays).hasSize(1)
+    with(stays.single()) {
+      assertThat(arrivedAt).isEqualTo(admission.occurredAt)
+      assertThat(departedAt).isEqualTo(rel.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
+    assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
+    assertThat(episode.concludedAt).isEqualTo(rel.occurredAt)
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.COMPLETED)
+
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
+    assertThat(journeys).hasSize(1)
+    with(journeys.single()) {
+      assertThat(type).isEqualTo(ExternalJourney.Type.TEMPORARY_ABSENCE)
+      assertThat(externalReference).isEqualTo(tapDep.scheduleReference!!)
+      assertThat(commencedAt).isEqualTo(tapDep.occurredAt)
+      assertThat(concludedAt).isEqualTo(rel.occurredAt)
+      assertThat(origin).isEqualTo(prisonOne.code)
+      assertThat(destination).isNull()
+    }
   }
 }

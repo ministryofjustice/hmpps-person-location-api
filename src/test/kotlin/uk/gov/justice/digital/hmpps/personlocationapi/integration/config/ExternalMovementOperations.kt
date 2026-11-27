@@ -1,6 +1,7 @@
 package uk.gov.justice.digital.hmpps.personlocationapi.integration.config
 
 import org.springframework.data.repository.findByIdOrNull
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.courtCode
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.prisonCode
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.DataGenerator.word
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.ExternalMovementRepository
@@ -10,6 +11,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.Exter
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.entities.ExternalMovement.Type
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.CodedReason
+import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Court
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Location
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.MovementReason
 import uk.gov.justice.digital.hmpps.personlocationapi.persistence.values.Prison
@@ -37,6 +39,7 @@ class ExternalMovementOperationsImpl(
   companion object {
     fun reason(code: String = word(6), description: String = word(40)) = CodedReason(code, description)
     fun prison(code: String = prisonCode(), description: String = word(25)) = Prison(code, description)
+    fun court(code: String = courtCode(), description: String = word(20)) = Court(code, description)
     fun outOfPrison(description: String = word(20)) = SimpleLocation(description)
 
     fun externalMovement(

@@ -47,35 +47,63 @@ class RefreshExternalMovementIntervals(
     }
     val effectiveRefreshFrom = lastMovementBeforeRefresh?.occurredAt ?: event.refreshFrom
 
-    val existingEpisodes = episodeRepository.findActiveOrAfter(personIdentifier, effectiveRefreshFrom)
-    val existingStays = stayRepository.findActiveOrAfter(personIdentifier, effectiveRefreshFrom)
-    val existingJourneys = journeyRepository.findActiveOrAfter(personIdentifier, effectiveRefreshFrom)
-    val existingIntervals = intervalRepository.findFromCutoffOnward(personIdentifier, effectiveRefreshFrom)
+    val initialEpisodes = episodeRepository.findActiveOrAfter(personIdentifier, effectiveRefreshFrom)
+    val initialStays = stayRepository.findActiveOrAfter(personIdentifier, effectiveRefreshFrom)
+    val initialJourneys = journeyRepository.findActiveOrAfter(personIdentifier, effectiveRefreshFrom)
+    val initialIntervals = intervalRepository.findFromCutoffOnward(personIdentifier, effectiveRefreshFrom)
 
-    val replayStartAt = listOfNotNull(
-      effectiveRefreshFrom,
-      existingEpisodes.minOfOrNull { it.commencedAt },
-      existingStays.minOfOrNull { it.arrivedAt },
-      existingJourneys.minOfOrNull { it.commencedAt },
-      existingIntervals.minOfOrNull { it.validFrom },
-    ).minOrNull()
+    val requiresFullRebuild = initialEpisodes.isEmpty() || initialStays.isEmpty()
+    val effectiveCutoff = if (requiresFullRebuild) null else effectiveRefreshFrom
+
+    val existingEpisodes = if (requiresFullRebuild) {
+      episodeRepository.findActiveOrAfter(personIdentifier, null)
+    } else {
+      initialEpisodes
+    }
+    val existingStays = if (requiresFullRebuild) {
+      stayRepository.findActiveOrAfter(personIdentifier, null)
+    } else {
+      initialStays
+    }
+    val existingJourneys = if (requiresFullRebuild) {
+      journeyRepository.findActiveOrAfter(personIdentifier, null)
+    } else {
+      initialJourneys
+    }
+    val existingIntervals = if (requiresFullRebuild) {
+      intervalRepository.findFromCutoffOnward(personIdentifier, null)
+    } else {
+      initialIntervals
+    }
+
+    val replayStartAt = if (requiresFullRebuild) {
+      null
+    } else {
+      listOfNotNull(
+        effectiveCutoff,
+        existingEpisodes.minOfOrNull { it.commencedAt },
+        existingStays.minOfOrNull { it.arrivedAt },
+        existingJourneys.minOfOrNull { it.commencedAt },
+        existingIntervals.minOfOrNull { it.validFrom },
+      ).minOrNull()
+    }
 
     val deduplicatedMovements = allMovements
-      .filter { replayStartAt == null || !it.occurredAt.isBefore(replayStartAt) }
       .deduplicateAndPrioritize()
+      .filter { replayStartAt == null || !it.occurredAt.isBefore(replayStartAt) }
 
     val orderedMovements = deduplicatedMovements.normalizeForTimeline()
-    val targetIntervals = orderedMovements.projectIntervals(effectiveRefreshFrom)
+    val targetIntervals = orderedMovements.projectIntervals(effectiveCutoff)
     val targetTimeline = orderedMovements.projectTimeline()
 
     val activeTargetEpisodes = targetTimeline.episodes.filter {
-      effectiveRefreshFrom == null || it.concludedAt == null || !it.concludedAt!!.isBefore(effectiveRefreshFrom)
+      effectiveCutoff == null || it.concludedAt == null || !it.concludedAt!!.isBefore(effectiveCutoff)
     }
     val activeTargetStays = targetTimeline.stays.filter {
-      effectiveRefreshFrom == null || it.departedAt == null || !it.departedAt!!.isBefore(effectiveRefreshFrom)
+      effectiveCutoff == null || it.departedAt == null || !it.departedAt!!.isBefore(effectiveCutoff)
     }
     val activeTargetJourneys = targetTimeline.journeys.filter {
-      effectiveRefreshFrom == null || it.concludedAt == null || !it.concludedAt!!.isBefore(effectiveRefreshFrom)
+      effectiveCutoff == null || it.concludedAt == null || !it.concludedAt!!.isBefore(effectiveCutoff)
     }
 
     mergeIntervals(personIdentifier, existingIntervals, targetIntervals)

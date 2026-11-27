@@ -27,6 +27,7 @@ object DataGenerator {
       prisonCode(attempts - 1)
     }
   }
+  fun courtCode(): String = (1..6).map { letters.random() }.joinToString("")
 
   fun externalReference(
     entity: ExternalReferenceEntity = ExternalReferenceEntity.entries.random(),

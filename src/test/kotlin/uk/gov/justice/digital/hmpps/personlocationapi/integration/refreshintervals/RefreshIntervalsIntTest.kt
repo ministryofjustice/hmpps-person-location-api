@@ -11,6 +11,7 @@ import uk.gov.justice.digital.hmpps.personlocationapi.integration.IntegrationTes
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.CustodialSeriesOperations
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.CustodialSeriesOperationsImpl.Companion.custodialSeries
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.ExternalMovementOperations
+import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.ExternalMovementOperationsImpl.Companion.court
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.ExternalMovementOperationsImpl.Companion.externalMovement
 import uk.gov.justice.digital.hmpps.personlocationapi.integration.config.ExternalMovementOperationsImpl.Companion.prison
 import uk.gov.justice.digital.hmpps.personlocationapi.model.action.movement.ApplyOccurredAt
@@ -37,6 +38,11 @@ class RefreshIntervalsIntTest(
 ) : IntegrationTest(),
   CustodialSeriesOperations by seriesOps,
   ExternalMovementOperations by moveOps {
+
+  @Test
+  fun `local test`() {
+    refresh.execute(RefreshPersonMovementIntervals("A0240FM"))
+  }
 
   @Test
   fun `can correctly add new stays and episodes for single series`() {
@@ -1579,5 +1585,106 @@ class RefreshIntervalsIntTest(
       assertThat(concludedAt).isEqualTo(finalMrgRelease.occurredAt)
       assertThat(status).isEqualTo(CustodialEpisode.Status.COMPLETED)
     }
+  }
+
+  @Test
+  fun `out-of-order movements before admission are reconciled when admission arrives later`() {
+    val personIdentifier = personIdentifier()
+    val prisonOne = prison()
+    val court = court()
+    val series = givenSeries(
+      custodialSeries(
+        personIdentifier,
+        openedAt = LocalDateTime.of(2026, 9, 2, 16, 31, 49),
+      ),
+    )
+
+    // 1. Out-of-order court appearance arrives before the initial admission, triggering a partial refresh
+    val courtDepOne = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.COURT_APPEARANCE,
+        reason = CodedReason("CRT", "Court Appearance"),
+        origin = prisonOne,
+        destination = court,
+        scheduleReference = externalReference(ExternalReferenceEntity.COURT_APPEARANCE),
+        occurredAt = LocalDateTime.of(2026, 10, 23, 9, 0),
+      ),
+    )
+    val courtArrOne = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.COURT_APPEARANCE,
+        reason = CodedReason("CRT", "Court Appearance"),
+        origin = court,
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2026, 10, 23, 12, 0),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier, courtDepOne.occurredAt))
+
+    assertThat(stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)).isEmpty()
+    assertThat(episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier)).isEmpty()
+    assertThat(journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)).isNotEmpty()
+
+    // 2. Backdated admission and additional court movements arrive; refresh triggers full rebuild
+    val admission = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        reason = CodedReason("N", "Unconvicted Remand"),
+        origin = court,
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2026, 9, 2, 16, 30),
+      ),
+    )
+    val courtDepTwo = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.COURT_APPEARANCE,
+        reason = CodedReason("CRT", "Court Appearance"),
+        origin = prisonOne,
+        destination = court,
+        scheduleReference = externalReference(ExternalReferenceEntity.COURT_APPEARANCE),
+        occurredAt = LocalDateTime.of(2026, 11, 16, 9, 0),
+      ),
+    )
+    val courtArrTwo = givenMovement(
+      externalMovement(
+        series,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.COURT_APPEARANCE,
+        reason = CodedReason("CRT", "Court Appearance"),
+        origin = court,
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2026, 11, 16, 17, 0),
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier, admission.occurredAt))
+
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
+    assertThat(stays).hasSize(1)
+    with(stays.single()) {
+      assertThat(prisonCode).isEqualTo(prisonOne.code)
+      assertThat(arrivedAt).isEqualTo(admission.occurredAt)
+      assertThat(departedAt).isNull()
+      assertThat(status).isEqualTo(PrisonStay.Status.RESIDENT)
+    }
+
+    val episode = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).single()
+    assertThat(episode.commencedAt).isEqualTo(admission.occurredAt)
+    assertThat(episode.concludedAt).isNull()
+    assertThat(episode.status).isEqualTo(CustodialEpisode.Status.ACTIVE)
+
+    val journeys = journeyRepository.findAllByPersonIdentifierOrderByCommencedAtAsc(personIdentifier)
+    assertThat(journeys).hasSize(2)
+    assertThat(journeys.map { it.commencedAt }).containsExactly(courtDepOne.occurredAt, courtDepTwo.occurredAt)
+    assertThat(journeys.map { it.concludedAt }).containsExactly(courtArrOne.occurredAt, courtArrTwo.occurredAt)
   }
 }

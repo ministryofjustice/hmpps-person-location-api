@@ -335,11 +335,11 @@ private fun List<DeduplicatedMovement>.shouldProcessRelease(
   val movement = this[index]
   val hasNoLaterMovement = index == lastIndex
   val hasOpenStay = currentStay != null && currentStay.departedAt == null
-  val isSameBooking = currentStay?.legacyBookingIds?.size == 1 &&
-    movement.legacyBookingIds.size == 1 &&
-    currentStay.legacyBookingIds.single() == movement.legacyBookingIds.single()
+  val matchesCurrentStayBooking = currentStay != null &&
+    movement.legacyBookingIds.isNotEmpty() &&
+    movement.legacyBookingIds.any { it in currentStay.legacyBookingIds }
 
-  return hasOpenStay && isSameBooking && hasNoLaterMovement
+  return hasOpenStay && matchesCurrentStayBooking && hasNoLaterMovement
 }
 
 private fun MovementReason.isForMerge() = (this is CodedReason && isMergeReason())

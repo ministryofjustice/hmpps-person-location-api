@@ -1380,4 +1380,204 @@ class RefreshIntervalsIntTest(
       assertThat(destination).isNull()
     }
   }
+
+  @Test
+  fun `final MRG release after booking merge closes stay and episode`() {
+    val personIdentifier = personIdentifier()
+    val prisonOne = prison()
+
+    val seriesOne = givenSeries(
+      custodialSeries(
+        personIdentifier,
+        openedAt = LocalDateTime.of(2024, 11, 15, 14, 18, 41),
+        closedAt = LocalDateTime.of(2025, 7, 18, 14, 31, 27),
+        status = CustodialSeries.Status.CLOSED,
+        isActive = false,
+        legacyId = newId(),
+      ),
+    )
+    val seriesTwo = givenSeries(
+      custodialSeries(
+        personIdentifier,
+        openedAt = LocalDateTime.of(2024, 11, 20, 18, 18, 6),
+        legacyId = newId(),
+      ),
+    )
+
+    // Episode 1: 2024-11-15 to 2025-07-18 (includes merge and court round trip)
+    val ep1Admission = givenMovement(
+      externalMovement(
+        seriesOne,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        reason = CodedReason("N", "Unconvicted Remand"),
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2024, 11, 15, 14, 18, 41),
+        legacyId = "${seriesOne.legacyId}_1",
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        reason = CodedReason("L", "Licence Revokee"),
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2024, 11, 20, 18, 18, 6),
+        legacyId = "${seriesTwo.legacyId}_1",
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesOne,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        reason = CodedReason("MRG", "Administrative Release due to Merge"),
+        origin = prisonOne,
+        occurredAt = LocalDateTime.of(2024, 11, 20, 18, 18, 47),
+        legacyId = "${seriesOne.legacyId}_2",
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.COURT_APPEARANCE,
+        reason = CodedReason("SENT", "Sentencing"),
+        origin = prisonOne,
+        scheduleReference = externalReference(ExternalReferenceEntity.COURT_APPEARANCE),
+        occurredAt = LocalDateTime.of(2025, 7, 4, 9, 9, 0),
+        legacyId = "${seriesTwo.legacyId}_2",
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.COURT_APPEARANCE,
+        reason = CodedReason("SENT", "Sentencing"),
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2025, 7, 4, 15, 6, 0),
+        legacyId = "${seriesTwo.legacyId}_3",
+      ),
+    )
+    val ep1Release = givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        reason = CodedReason("CR", "CONDITIONAL RELEASE"),
+        origin = prisonOne,
+        occurredAt = LocalDateTime.of(2025, 7, 18, 14, 31, 27),
+        legacyId = "${seriesTwo.legacyId}_4",
+      ),
+    )
+
+    // Episode 2: 2025-07-28 to 2026-02-24 (booking merge, then final MRG release)
+    val seriesThree = givenSeries(
+      custodialSeries(
+        personIdentifier,
+        openedAt = LocalDateTime.of(2025, 7, 28, 14, 25, 46),
+        closedAt = LocalDateTime.of(2025, 7, 29, 9, 43, 22),
+        status = CustodialSeries.Status.CLOSED,
+        isActive = false,
+        legacyId = newId(),
+      ),
+    )
+    val ep2Admission = givenMovement(
+      externalMovement(
+        seriesThree,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        reason = CodedReason("N", "Unconvicted Remand"),
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2025, 7, 28, 14, 25, 46),
+        legacyId = "${seriesThree.legacyId}_1",
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesThree,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        reason = CodedReason("MRG", "Administrative Release due to Merge"),
+        origin = prisonOne,
+        occurredAt = LocalDateTime.of(2025, 7, 29, 9, 43, 22),
+        legacyId = "${seriesThree.legacyId}_2",
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.ADMISSION,
+        reason = CodedReason("L", "Licence Revokee"),
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2025, 7, 29, 9, 43, 33),
+        legacyId = "${seriesTwo.legacyId}_5",
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.COURT_APPEARANCE,
+        reason = CodedReason("CRT", "Court Appearance"),
+        origin = prisonOne,
+        scheduleReference = externalReference(ExternalReferenceEntity.COURT_APPEARANCE),
+        occurredAt = LocalDateTime.of(2026, 1, 20, 7, 56, 0),
+        legacyId = "${seriesTwo.legacyId}_10",
+      ),
+    )
+    givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.ARRIVAL,
+        journeyType = ExternalJourney.Type.COURT_APPEARANCE,
+        reason = CodedReason("CRT", "Court Appearance"),
+        destination = prisonOne,
+        occurredAt = LocalDateTime.of(2026, 1, 20, 15, 34, 0),
+        legacyId = "${seriesTwo.legacyId}_11",
+      ),
+    )
+    val finalMrgRelease = givenMovement(
+      externalMovement(
+        seriesTwo,
+        movementType = ExternalMovement.Type.DEPARTURE,
+        journeyType = ExternalJourney.Type.RELEASE,
+        reason = CodedReason("MRG", "Administrative Release due to Merge"),
+        origin = prisonOne,
+        occurredAt = LocalDateTime.of(2026, 2, 24, 13, 51, 46),
+        legacyId = "${seriesTwo.legacyId}_12",
+      ),
+    )
+
+    refresh.execute(RefreshPersonMovementIntervals(personIdentifier))
+
+    val stays = stayRepository.findAllByPersonIdentifierOrderByArrivedAtAsc(personIdentifier)
+    assertThat(stays).hasSize(2)
+    with(stays.first()) {
+      assertThat(arrivedAt).isEqualTo(ep1Admission.occurredAt)
+      assertThat(departedAt).isEqualTo(ep1Release.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+    with(stays.last()) {
+      assertThat(arrivedAt).isEqualTo(ep2Admission.occurredAt)
+      assertThat(departedAt).isEqualTo(finalMrgRelease.occurredAt)
+      assertThat(status).isEqualTo(PrisonStay.Status.RELEASED)
+    }
+
+    val episodes = episodeRepository.findAllByPersonIdentifierOrderByCommencedAtDesc(personIdentifier).reversed()
+    assertThat(episodes).hasSize(2)
+    with(episodes.first()) {
+      assertThat(commencedAt).isEqualTo(ep1Admission.occurredAt)
+      assertThat(concludedAt).isEqualTo(ep1Release.occurredAt)
+      assertThat(status).isEqualTo(CustodialEpisode.Status.COMPLETED)
+    }
+    with(episodes.last()) {
+      assertThat(commencedAt).isEqualTo(ep2Admission.occurredAt)
+      assertThat(concludedAt).isEqualTo(finalMrgRelease.occurredAt)
+      assertThat(status).isEqualTo(CustodialEpisode.Status.COMPLETED)
+    }
+  }
 }
